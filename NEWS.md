@@ -1,3 +1,7 @@
+# survivehrR 0.7.2
+
+* updated tutorials for installing package.
+
 # survivehrR 0.7.1
 
 * **Python 3.8 / 3.9 compatibility fix**: the vendored SurvivEHR model code used

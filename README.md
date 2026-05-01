@@ -30,12 +30,12 @@ Install from GitHub using `remotes` or `pak`:
 
 ```r
 # install.packages("remotes")
-remotes::install_github("PM-Cardoso/SurvivEHR", ref = "R-package")
+remotes::install_github("PM-Cardoso/RSurvivEHR")
 ```
 
 ```r
 # install.packages("pak")
-pak::pkg_install("PM-Cardoso/SurvivEHR@R-package")
+pak::pkg_install("PM-Cardoso/RSurvivEHR")
 ```
 
 After installing, set up the Python backend (one-time):
