@@ -16,7 +16,7 @@ Encoding: UTF-8
 LazyData: false
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-URL: https://pm-cardoso.github.io/SurvivEHR/, https://github.com/PM-Cardoso/SurvivEHR
+URL: https://pm-cardoso.github.io/RSurvivEHR/, https://github.com/PM-Cardoso/SurvivEHR
 BugReports: https://github.com/PM-Cardoso/SurvivEHR/issues
 Depends: R (>= 4.2)
 Imports:
