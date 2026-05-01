@@ -16,6 +16,22 @@ pipeline is:
 
 ## 1 Setup (one-time)
 
+Install the package from GitHub:
+
+``` r
+
+# install.packages("remotes")
+remotes::install_github("PM-Cardoso/RSurvivEHR")
+```
+
+``` r
+
+# install.packages("pak")
+pak::pkg_install("PM-Cardoso/RSurvivEHR")
+```
+
+Then set up the Python backend (only needed once):
+
 ``` r
 
 library(survivehrR)

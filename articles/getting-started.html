@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">survivehrR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -87,7 +87,15 @@ new events ────────▶ survivehr_predict()  ──▶ prediction
 <div class="section level2">
 <h2 id="setup-one-time">1 Setup (one-time)<a class="anchor" aria-label="anchor" href="#setup-one-time"></a>
 </h2>
+<p>Install the package from GitHub:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># install.packages("remotes")</span></span>
+<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"PM-Cardoso/RSurvivEHR"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pkg_install.html" class="external-link">pkg_install</a></span><span class="op">(</span><span class="st">"PM-Cardoso/RSurvivEHR"</span><span class="op">)</span></span></code></pre></div>
+<p>Then set up the Python backend (only needed once):</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://pm-cardoso.github.io/RSurvivEHR/">survivehrR</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Creates the "survivehrR" Python virtualenv and installs all dependencies.</span></span>
@@ -102,7 +110,7 @@ new events ────────▶ survivehr_predict()  ──▶ prediction
 <h3 id="events-data-frame">Events data frame<a class="anchor" aria-label="anchor" href="#events-data-frame"></a>
 </h3>
 <p>One row per clinical event, sorted by age within each patient.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">events</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  patient_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">1</span>,   <span class="fl">2</span>, <span class="fl">2</span>, <span class="fl">2</span>, <span class="fl">2</span>, <span class="fl">2</span>,   <span class="fl">3</span>, <span class="fl">3</span>, <span class="fl">3</span>, <span class="fl">3</span>, <span class="fl">3</span><span class="op">)</span>,</span>
 <span>  event      <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"HYPERTENSION"</span>, <span class="st">"STATIN"</span>,    <span class="st">"T2D"</span>,     <span class="st">"BP_CHECK"</span>,  <span class="st">"METFORMIN"</span>,</span>
@@ -145,7 +153,7 @@ encodes whatever it finds. By contrast, the <strong>events</strong> and
 <code>target_value</code> respectively) or their FastEHR UPPER_CASE
 aliases.</p>
 </blockquote>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">static_covariates</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  patient_id     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span>,</span>
 <span>  SEX            <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"M"</span>, <span class="st">"F"</span>, <span class="st">"M"</span><span class="op">)</span>,           <span class="co"># categorical → one-hot</span></span>
@@ -166,7 +174,7 @@ a clear error if prediction data does not match.</p>
 <p>Run the validators before any training call to catch schema problems
 early — wrong column names, unsorted ages, non-numeric values — with a
 clear R error rather than a cryptic Python traceback.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/survivehr_validate_events.html">survivehr_validate_events</a></span><span class="op">(</span><span class="va">events</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/survivehr_validate_static.html">survivehr_validate_static</a></span><span class="op">(</span><span class="va">static_covariates</span><span class="op">)</span></span>
 <span><span class="co"># [OK] Events: 15 rows, 3 patients. Columns present, ages numeric and time-ordered.</span></span>
@@ -179,7 +187,7 @@ clear R error rather than a cryptic Python traceback.</p>
 </h2>
 <p><code><a href="../reference/survivehr_config.html">survivehr_config()</a></code> returns a named list consumed by all
 training functions.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">cfg</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_config.html">survivehr_config</a></span><span class="op">(</span></span>
 <span>  block_size    <span class="op">=</span> <span class="fl">64</span>,   <span class="co"># context window — sequences are padded/truncated to this</span></span>
 <span>  n_layer       <span class="op">=</span> <span class="fl">2</span>,    <span class="co"># transformer blocks</span></span>
@@ -233,7 +241,7 @@ reserved for unseen events at prediction time.</td>
 </h2>
 <p>Pre-training builds the vocabulary and trains the backbone
 transformer on the full event history.</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pt_model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_pretrain.html">survivehr_pretrain</a></span><span class="op">(</span></span>
 <span>  events            <span class="op">=</span> <span class="va">events</span>,</span>
 <span>  static_covariates <span class="op">=</span> <span class="va">static_covariates</span>,</span>
@@ -248,7 +256,7 @@ transformer on the full event history.</p>
 </h3>
 <p>Save the backbone now so you can load it later and fine-tune on
 different outcome definitions without re-training from scratch.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/survivehr_save_model.html">survivehr_save_model</a></span><span class="op">(</span><span class="va">pt_model</span>, <span class="st">"pretrain_backbone.pt"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Reload at any time — vocabulary, time_scale, and token policy are all preserved</span></span>
@@ -265,7 +273,7 @@ the outcome for each patient. Events in the fine-tuning set must
 (leakage-free context).</p>
 <p>Build a combined events/static table that includes the labelled
 patients:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Add two labelled patients: patient 4 developed T2D, patient 5 developed CVD</span></span>
 <span><span class="va">events_all</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span></span>
 <span>  <span class="va">events</span>,</span>
@@ -291,7 +299,7 @@ patients:</p>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Validate the extended dataset before fine-tuning:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/survivehr_validate_events.html">survivehr_validate_events</a></span><span class="op">(</span><span class="va">events_all</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/survivehr_validate_static.html">survivehr_validate_static</a></span><span class="op">(</span><span class="va">static_all</span><span class="op">)</span></span>
 <span><span class="co"># [OK] Events: 26 rows, 5 patients. Columns present, ages numeric and time-ordered.</span></span>
@@ -303,7 +311,7 @@ patients:</p>
 outcomes compete — i.e. the occurrence of one prevents the other from
 being observed. A separate ODE survival head is fitted for each
 outcome.</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">targets_cr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  patient_id   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4L</span>, <span class="fl">5L</span><span class="op">)</span>,</span>
 <span>  target_event <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"T2D"</span>, <span class="st">"CVD"</span><span class="op">)</span>,</span>
@@ -336,7 +344,7 @@ outcome.</p>
 <p>Use <code>risk_model = "single-risk"</code> when there is a single
 endpoint of interest and no competing events need to be modelled
 explicitly.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">targets_sr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  patient_id   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4L</span>, <span class="fl">5L</span><span class="op">)</span>,</span>
 <span>  target_event <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"T2D"</span>, <span class="st">"T2D"</span><span class="op">)</span>,</span>
@@ -387,7 +395,7 @@ explicitly.</p>
 <div class="section level2">
 <h2 id="save-and-load-fine-tuned-models">6 Save and load fine-tuned models<a class="anchor" aria-label="anchor" href="#save-and-load-fine-tuned-models"></a>
 </h2>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/survivehr_save_model.html">survivehr_save_model</a></span><span class="op">(</span><span class="va">ft_cr</span>, <span class="st">"model_cr.pt"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/survivehr_save_model.html">survivehr_save_model</a></span><span class="op">(</span><span class="va">ft_sr</span>, <span class="st">"model_sr.pt"</span><span class="op">)</span></span>
 <span></span>
@@ -399,7 +407,7 @@ explicitly.</p>
 <div class="section level2">
 <h2 id="prediction">7 Prediction<a class="anchor" aria-label="anchor" href="#prediction"></a>
 </h2>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Competing-risk predictions (T2D vs CVD)</span></span>
 <span><span class="va">preds_cr</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_predict.html">survivehr_predict</a></span><span class="op">(</span><span class="va">ft_cr2</span>, <span class="va">events_all</span>, <span class="va">static_all</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">preds_cr</span><span class="op">)</span></span>
@@ -438,7 +446,7 @@ window.</td>
 training time. The model stores the exact encoded column list (including
 one-hot expanded categories) and raises a clear error rather than
 silently producing wrong predictions if there is a mismatch.</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">new_patient</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  patient_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">99</span>, <span class="fl">99</span>, <span class="fl">99</span>, <span class="fl">99</span><span class="op">)</span>,</span>
 <span>  event      <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"T2D"</span>, <span class="st">"BP_CHECK"</span>, <span class="st">"METFORMIN"</span>, <span class="st">"ASPIRIN"</span><span class="op">)</span>,  <span class="co"># ASPIRIN → &lt;UNK&gt;</span></span>
