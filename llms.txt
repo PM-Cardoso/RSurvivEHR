@@ -1,0 +1,122 @@
+# survivehrR
+
+📦 **Website**: <https://pm-cardoso.github.io/RSurvivEHR/>  
+🐛 **Issues / source**: <https://github.com/PM-Cardoso/RSurvivEHR>
+
+`survivehrR` is a standalone R package that lets you run the
+**SurvivEHR** transformer survival model directly from R data frames. It
+requires no FastEHR installation; all Python model code is vendored
+inside the package.
+
+------------------------------------------------------------------------
+
+## Contents
+
+1.  [Installation](#installation)
+2.  [Input format](#input-format)
+3.  [Special tokens — where PAD and UNK appear](#special-tokens)
+4.  [Age normalisation and `time_scale`](#age-normalisation)
+5.  [Value normalisation](#value-normalisation)
+6.  [Preparing fine-tune context (avoiding
+    leakage)](#preparing-fine-tune-context)
+7.  [Static covariates encoding](#static-covariates-encoding)
+8.  [Full worked example](#full-worked-example)
+9.  [Configuration reference](#configuration-reference)
+10. [FastEHR column aliases](#fastehr-column-aliases)
+
+------------------------------------------------------------------------
+
+## Installation
+
+Install from GitHub using `remotes` or `pak`:
+
+``` r
+
+# install.packages("remotes")
+remotes::install_github("PM-Cardoso/SurvivEHR", ref = "R-package")
+```
+
+``` r
+
+# install.packages("pak")
+pak::pkg_install("PM-Cardoso/SurvivEHR@R-package")
+```
+
+After installing, set up the Python backend (one-time):
+
+``` r
+
+library(survivehrR)
+survivehr_setup()
+```
+
+------------------------------------------------------------------------
+
+## Input format
+
+| Table | Required columns | Optional |
+|----|----|----|
+| **events** | `patient_id`, `event`, `age` | `value` |
+| **static_covariates** | `patient_id` + any covariate columns | — |
+| **targets** (fine-tune) | `patient_id`, `target_event`, `target_age` | `target_value` |
+
+### Column naming rules
+
+| Table | Column names | Notes |
+|----|----|----|
+| **events** | **Fixed** | Must be exactly `patient_id`, `event`, `age`, `value`. FastEHR UPPER_CASE aliases are also accepted (see [FastEHR column aliases](#fastehr-column-aliases)). |
+| **targets** | **Fixed** | Must be exactly `patient_id`, `target_event`, `target_age`, `target_value`. FastEHR aliases accepted. |
+| **static_covariates** | **Completely free** (except `patient_id`) | Name covariate columns whatever you like — `SEX`, `imd`, `YearOfBirth`, etc. The backend encodes whatever it finds. The only rule is that the **same column names must be used consistently** across pretrain, fine-tune, and prediction. |
+
+# Package index
+
+## Setup
+
+Install and configure the Python backend.
+
+- [`survivehr_setup()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_setup.md)
+  : Set up the SurvivEHR Python environment
+
+## Configuration
+
+Build and inspect model configuration.
+
+- [`survivehr_config()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_config.md)
+  : Build default SurvivEHR configuration
+
+## Training
+
+Pre-train, fine-tune, save, and load SurvivEHR models.
+
+- [`survivehr_pretrain()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_pretrain.md)
+  : Train a pretrain SurvivEHR model from R data frames
+- [`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md)
+  : Fine-tune SurvivEHR from R data frames
+- [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
+  : Predict next events with SurvivEHR
+- [`survivehr_save_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.md)
+  : Save a SurvivEHR model bundle
+- [`survivehr_load_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_load_model.md)
+  : Load a SurvivEHR model bundle
+
+## Validation helpers
+
+Validate input data frames before passing to training functions.
+
+- [`survivehr_validate_events()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_events.md)
+  : Validate events schema for SurvivEHR
+- [`survivehr_validate_static()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_static.md)
+  : Validate static covariates schema for SurvivEHR
+- [`survivehr_validate_targets()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_targets.md)
+  : Validate fine-tune targets schema for SurvivEHR
+
+# Articles
+
+### All vignettes
+
+- [Advanced
+  topics](https://pm-cardoso.github.io/RSurvivEHR/articles/advanced-topics.md):
+- [Getting started with
+  survivehrR](https://pm-cardoso.github.io/RSurvivEHR/articles/getting-started.md):
+- [Model architecture and parameter
+  reference](https://pm-cardoso.github.io/RSurvivEHR/articles/model-architecture.md):
