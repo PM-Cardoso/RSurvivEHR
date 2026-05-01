@@ -1,0 +1,74 @@
+url: https://pm-cardoso.github.io/SurvivEHR/
+
+template:
+  bootstrap: 5
+  bootswatch: flatly
+  bslib:
+    primary: "#2c7bb6"
+    headings-font-weight: 600
+
+home:
+  title: "survivehrR — Transformer Survival Models for EHR Data"
+  description: >
+    An R interface to SurvivEHR: pre-train a competing-risk transformer on
+    longitudinal EHR event sequences, fine-tune on labelled outcomes, and
+    predict survival probabilities — all from plain R data frames.
+  links:
+    - text: "GitHub repository"
+      href: https://github.com/PM-Cardoso/SurvivEHR
+    - text: "Report a bug"
+      href: https://github.com/PM-Cardoso/SurvivEHR/issues
+
+navbar:
+  structure:
+    left:  [intro, reference, articles, news]
+    right: [github]
+  components:
+    intro:
+      text: "Get started"
+      href: articles/getting-started.html
+    articles:
+      text: Articles
+      menu:
+        - text: "Getting started"
+          href: articles/getting-started.html
+        - text: "Advanced topics"
+          href: articles/advanced-topics.html
+        - text: "Model architecture & parameter reference"
+          href: articles/model-architecture.html
+    github:
+      icon: fab fa-github
+      href: https://github.com/PM-Cardoso/SurvivEHR
+      aria-label: GitHub
+
+reference:
+  - title: "Setup"
+    desc: "Install and configure the Python backend."
+    contents:
+      - survivehr_setup
+
+  - title: "Configuration"
+    desc: "Build and inspect model configuration."
+    contents:
+      - survivehr_config
+
+  - title: "Training"
+    desc: "Pre-train, fine-tune, save, and load SurvivEHR models."
+    contents:
+      - survivehr_pretrain
+      - survivehr_finetune
+      - survivehr_predict
+      - survivehr_save_model
+      - survivehr_load_model
+
+  - title: "Validation helpers"
+    desc: "Validate input data frames before passing to training functions."
+    contents:
+      - survivehr_validate_events
+      - survivehr_validate_static
+      - survivehr_validate_targets
+
+news:
+  releases:
+    - text: "Version 0.1.0"
+      href: news/index.html

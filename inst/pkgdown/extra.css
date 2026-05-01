@@ -1,0 +1,31 @@
+/* survivehrR — pkgdown custom styles */
+
+/* Sidebar nav active item */
+.sidebar .active > a {
+  font-weight: 700;
+  color: #2c7bb6;
+}
+
+/* Reference index table */
+.ref-index h2 {
+  border-bottom: 2px solid #2c7bb6;
+  padding-bottom: 4px;
+  margin-top: 2rem;
+}
+
+/* Code blocks */
+pre code {
+  font-size: 0.85rem;
+}
+
+/* Navbar brand */
+.navbar-brand {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Article cards on home page */
+.card-body .card-title {
+  font-size: 1rem;
+  font-weight: 600;
+}

@@ -1,0 +1,262 @@
+---
+title: "Advanced topics"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Advanced topics}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+## Token policy in depth
+
+survivehrR constructs the event vocabulary as:
+
+```
+Index  Token
+─────  ─────────────────────────────────────────
+  0    <PAD>   always present; padding_idx for the embedding layer
+  1    <UNK>   when include_unk = TRUE (default)
+  2    <CLS>   when include_cls_sep = TRUE
+  3    <SEP>   when include_cls_sep = TRUE
+  2+   clinical events, alphabetically sorted
+```
+
+`<PAD>` is always index 0 because SurvivEHR's `SplitDynamicEmbeddingLayer`
+uses `padding_idx = 0` internally.
+
+At prediction time any event code not present in `event_vocab` is replaced
+by `<UNK>` (index 1), provided `include_unk = TRUE`.
+
+---
+
+## Age normalisation
+
+All raw ages are divided by `time_scale` before entering the model:
+
+$$a_{\text{norm}} = \frac{a_{\text{raw}}}{\texttt{time\_scale}}$$
+
+The target time delta for fine-tuning is:
+
+$$\delta_{\text{norm}} = \frac{a_{\text{target}} - a_{\text{last context}}}{\texttt{time\_scale}}$$
+
+Use `time_scale = 1.0` (default) when ages are already in **years**.  
+Use `time_scale = 1825.0` when ages are in **days since birth**, matching
+FastEHR's `DAYS_SINCE_BIRTH` convention (1825 days ≈ 5 years).
+
+The `time_scale` is stored in the model bundle and automatically applied at
+fine-tune and predict time, so you only need to set it once in
+`survivehr_config()`.
+
+---
+
+## Static covariates encoding
+
+Static features are encoded into a flat numeric vector per patient:
+
+| Column type | Encoding |
+|---|---|
+| Character / factor / < 80 % numeric | One-hot via `pd.get_dummies` |
+| Fully numeric (int or float) | Passed through as-is |
+| Patient missing from `static_df` | All zeros |
+
+> **Column naming rule**: `patient_id` (or `PATIENT_ID`) is the only reserved
+> name in the static table.  All other column names are **user-defined** —
+> call them `SEX`, `imd`, `YearOfBirth`, or anything else.  The column names
+> become the basis for encoded feature names (e.g. `SEX` → `SEX_F`, `SEX_M`).
+> This is in contrast to the **events** and **targets** tables, which require
+> fixed column names (`patient_id`, `event`, `age`, `value`) or their FastEHR
+> UPPER_CASE aliases.  The only constraint for static columns is **consistency**:
+> the exact same names must be used at pretrain, fine-tune, and predict time.
+
+```{r}
+static_covariates <- data.frame(
+  patient_id     = 1:3,
+  SEX            = c("M",     "F",     "M"),       # → SEX_F, SEX_M
+  ETHNICITY      = c("White", "Asian", "White"),   # → ETHNICITY_Asian, ETHNICITY_White
+  SMOKING_STATUS = c("Never", "Ex",    "Current"), # → SMOKING_STATUS_Current, ..., Never
+  IMD            = c(3L, 1L, 5L),                 # numeric, passed through
+  YEAR_OF_BIRTH  = c(1965L, 1972L, 1955L)         # numeric, passed through
+)
+```
+
+The resulting static embedding for patient 1 (`M`, `White`, `Never`, IMD=3, YOB=1965)
+would be:
+
+```
+[SEX_F=0, SEX_M=1, ETHNICITY_Asian=0, ETHNICITY_White=1,
+ SMOKING_STATUS_Current=0, SMOKING_STATUS_Ex=0, SMOKING_STATUS_Never=1,
+ IMD=3, YEAR_OF_BIRTH=1965]
+```
+
+The **same** encoding scheme (same column order, same dummy categories) is
+derived at pre-train time and then **reused** at fine-tune and predict time
+from the saved bundle.
+
+---
+
+## Using a fixed vocabulary
+
+If you have pre-computed a vocabulary (e.g., from a previous run or from a
+shared codelist), pass it as `event_vocab`:
+
+```{r}
+# Build vocab manually
+my_vocab <- c("<PAD>" = 0L, "<UNK>" = 1L,
+              "HYPERTENSION" = 2L, "METFORMIN" = 3L,
+              "STATIN" = 4L, "T2D" = 5L)
+
+pt_model <- survivehr_pretrain(
+  events     = events,
+  config     = cfg,
+  event_vocab = my_vocab
+)
+```
+
+This is useful when pooling data across sites: build a common vocabulary
+from the union of all site codelists, then fix it so that model weights are
+comparable.
+
+---
+
+## FastEHR column aliases
+
+All functions accept the uppercase column names used by FastEHR:
+
+| survivehrR name | FastEHR alias |
+|---|---|
+| `patient_id` | `PATIENT_ID` |
+| `event` | `EVENT` |
+| `age` | `DAYS_SINCE_BIRTH` |
+| `value` | `VALUE` |
+| `target_event` | `TARGET_EVENT` / `EVENT` |
+| `target_age` | `TARGET_AGE` / `DAYS_SINCE_BIRTH` |
+
+When `DAYS_SINCE_BIRTH` is used, remember to set `time_scale = 1825.0` in
+`survivehr_config()`.
+
+---
+
+## Full 6-patient worked example
+
+This section walks through a complete analysis on 6 synthetic patients.
+
+```{r}
+library(survivehrR)
+
+# ── 1. Data ─────────────────────────────────────────────────────────────────
+all_events <- data.frame(
+  patient_id = c(1,1,1,1,1,1,  2,2,2,2,2,  3,3,3,3,3,  4,4,4,4,4,  5,5,5,5,5,5,  6,6,6,6,6,6),
+  event = c(
+    "HYPERTENSION","STATIN","T2D","BP_CHECK","HBA1C","METFORMIN",
+    "T2D","METFORMIN","HBA1C","HYPERTENSION","STATIN",
+    "STATIN","T2D","METFORMIN","BP_CHECK","HBA1C",
+    "HYPERTENSION","AMLODIPINE","BP_CHECK","STATIN","T2D",
+    "T2D","STATIN","HBA1C","HYPERTENSION","METFORMIN","CVD",
+    "T2D","HYPERTENSION","STATIN","BMI","METFORMIN","DEATH"
+  ),
+  age = c(
+    50.0, 50.5, 52.0, 52.1, 52.3, 52.5,
+    45.0, 45.3, 46.0, 47.5, 48.0,
+    58.0, 60.1, 60.4, 61.5, 62.0,
+    55.0, 55.4, 56.0, 57.2, 58.0,
+    48.0, 48.6, 49.0, 49.1, 50.5, 51.2,
+    60.0, 60.8, 62.5, 62.8, 63.0, 64.1
+  ),
+  value = c(
+    NA,  NA,  NA,  152, 54,  NA,   # p1: BP_CHECK=152 mmHg, HBA1C=54 mmol/mol
+    NA,  NA,  61,  NA,  NA,        # p2: HBA1C=61 mmol/mol
+    NA,  NA,  NA,  145, 58,        # p3: BP_CHECK=145 mmHg, HBA1C=58 mmol/mol
+    NA,  NA,  168, NA,  NA,        # p4: BP_CHECK=168 mmHg (hypertensive)
+    NA,  NA,  67,  NA,  NA,  NA,   # p5: HBA1C=67 mmol/mol (poorly controlled)
+    NA,  NA,  NA,  32.1,NA,  NA    # p6: BMI=32.1 kg/m² (obese)
+  )
+)
+
+static_covariates <- data.frame(
+  patient_id     = 1:6,
+  SEX            = c("M","F","M","F","M","F"),
+  ETHNICITY      = c("White","Asian","White","White","Black","White"),
+  SMOKING_STATUS = c("Never","Never","Ex","Never","Ex","Never"),
+  IMD            = c(3L, 1L, 5L, 2L, 4L, 3L),
+  YEAR_OF_BIRTH  = c(1965L,1972L,1955L,1960L,1968L,1958L)
+)
+
+# ── 2. Config ────────────────────────────────────────────────────────────────
+cfg <- survivehr_config(
+  block_size = 32, n_layer = 2, n_head = 2, n_embd = 64,
+  epochs = 2, batch_size = 4,
+  surv_layer = "competing-risk",
+  time_scale = 1.0
+)
+
+# ── 3. Pre-train on all patients ─────────────────────────────────────────────
+pt <- survivehr_pretrain(all_events, static_covariates, cfg)
+pt$event_vocab
+# <PAD>=0, <UNK>=1, AMLODIPINE=2, BMI=3, BP_CHECK=4, CVD=5,
+# DEATH=6, HBA1C=7, HYPERTENSION=8, METFORMIN=9, STATIN=10, T2D=11
+
+# ── 4. Fine-tune on CVD / DEATH (patients 5 & 6) ────────────────────────────
+# Context = all events BEFORE the labelled outcome age (leakage-free)
+ft_events <- all_events[!all_events$event %in% c("CVD","DEATH"), ]
+
+targets <- data.frame(
+  patient_id   = c(5L, 6L),
+  target_event = c("CVD", "DEATH"),
+  target_age   = c(51.2, 64.1)
+)
+# Patient 5: last context age = 50.5  → delta = (51.2 - 50.5) / 1.0 = 0.7
+# Patient 6: last context age = 63.0  → delta = (64.1 - 63.0) / 1.0 = 1.1
+
+ft <- survivehr_finetune(
+  events            = ft_events,
+  targets           = targets,
+  outcomes          = c("CVD", "DEATH"),
+  risk_model        = "competing-risk",
+  static_covariates = static_covariates,
+  config            = cfg,
+  pretrained_model  = pt
+)
+
+# ── 5. Predict on context patients ───────────────────────────────────────────
+preds <- survivehr_predict(ft, ft_events, static_covariates)
+preds
+
+# ── 6. Save / load round-trip ────────────────────────────────────────────────
+tmp <- tempfile(fileext = ".pt")
+survivehr_save_model(ft, tmp)
+ft2 <- survivehr_load_model(tmp)
+identical(ft2$event_vocab, ft$event_vocab)  # TRUE
+unlink(tmp)
+```
+
+---
+
+## Python environment setup
+
+survivehrR uses `reticulate` to call the vendored backend.  The first call
+to any training function will attempt to import PyTorch, pandas, and numpy.
+If these are not available in the current Python environment, install them:
+
+```r
+reticulate::py_install(
+  c("torch", "pandas", "numpy", "lightning"),
+  pip = TRUE
+)
+```
+
+To pin a specific Python interpreter:
+
+```r
+reticulate::use_python("/path/to/python", required = TRUE)
+```
+
+See `vignette("python_dependencies", package = "reticulate")` for full
+details.

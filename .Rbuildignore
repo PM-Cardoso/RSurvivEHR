@@ -1,0 +1,13 @@
+^\.venv$
+^_pkgdown\.yml$
+^\.github$
+^docs$
+^pkgdown$
+^lightning_logs$
+^outputs$
+^scripts$
+^containers$
+^src$
+^examples$
+^\.vscode$
+^README\.Rmd$
