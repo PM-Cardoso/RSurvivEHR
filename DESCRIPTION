@@ -1,7 +1,7 @@
 Package: RSurvivEHR
 Type: Package
 Title: Survival Analysis on Electronic Health Records via SurvivEHR
-Version: 0.7.3
+Version: 0.7.4
 Authors@R: person(given = "Pedro", family = "Cardoso", role = c("aut", "cre"),
     email = "p.cardoso@exeter.ac.uk", comment = c(ORCID = "0000-0000-0000-0000"))
 Description: An R interface to SurvivEHR, a transformer-based survival model

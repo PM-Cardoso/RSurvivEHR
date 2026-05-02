@@ -2,7 +2,7 @@
 # adapted from https://github.com/mmcdermott/EventStreamGPT/blob/main/EventStream/transformer/generative_layers.py
 import torch
 from torch import nn
-from typing import Optional
+from typing import Optional, List
 import logging
 import numpy as np
 # from pytorch_lognormal_mixture import LogNormalMixtureDistribution
@@ -43,7 +43,7 @@ class GaussianRegressionLayer(torch.nn.Module):
 
     def __init__(self,
                  in_dim: int,
-                 measurement_tokens: Optional[list[int]] = None,
+                 measurement_tokens: Optional[List[int]] = None,
                  base_hidden_dim: Optional[int] = None
                 ):
         super().__init__()

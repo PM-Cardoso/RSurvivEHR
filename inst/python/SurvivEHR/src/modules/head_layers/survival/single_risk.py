@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import logging
-from typing import Optional
+from typing import Optional, List
 
 from SurvivEHR.src.modules.head_layers.survival.desurv import ODESurvSingle
 
@@ -11,7 +11,7 @@ class ODESurvSingleRiskLayer(nn.Module):
     """ Wrapper around single-risk version of DeSurv
     """
     def __init__(self, 
-                 target_indicies: list[int],                     # which target_token index (indicies) to be used as the target risk
+                 target_indicies: List[int],                     # which target_token index (indicies) to be used as the target risk
                  in_dim, 
                  hidden_dim,
                  device="cpu",
