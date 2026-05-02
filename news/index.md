@@ -1,10 +1,21 @@
 # Changelog
 
-## survivehrR 0.7.2
+## RSurvivEHR 0.7.2
 
-- updated tutorials for installing package.
+- **Package repository renamed to `RSurvivEHR`**: installation
+  instructions updated throughout —
+  `remotes::install_github("PM-Cardoso/RSurvivEHR")` and
+  `pak::pkg_install("PM-Cardoso/RSurvivEHR")`. The `ref = "R-package"`
+  branch qualifier is no longer needed.
+- **README rewritten**: modern layout with badges, pipeline diagram,
+  quick-start example, and key-features table. Dead table-of-contents
+  sections removed; full detail lives in the pkgdown vignettes.
+- **All internal URLs corrected**: `_pkgdown.yml`, `DESCRIPTION`
+  (`URL:`, `BugReports:`), and the Getting started vignette now
+  consistently reference `https://github.com/PM-Cardoso/RSurvivEHR` and
+  `https://pm-cardoso.github.io/RSurvivEHR/`.
 
-## survivehrR 0.7.1
+## RSurvivEHR 0.7.1
 
 - **Python 3.8 / 3.9 compatibility fix**: the vendored SurvivEHR model
   code used Python 3.10+ structural pattern matching (`match`/`case`) in
@@ -18,7 +29,7 @@
   (e.g. EasyBuild foss-2021b toolchain, Python 3.9.6) and any Python \>=
   3.8.
 
-## survivehrR 0.7.0
+## RSurvivEHR 0.7.0
 
 - **Fixed static covariate validation for new / small-batch patients**:
   the previous strict equality check on one-hot encoded column names
@@ -66,7 +77,7 @@
   Configuration → 4 Pre-training → 5 Fine-tuning → 6 Save and load → 7
   Prediction.
 
-## survivehrR 0.6.0
+## RSurvivEHR 0.6.0
 
 - **Static covariate column validation**: the model now records the
   exact encoded column list (including one-hot expanded categories) at
@@ -94,7 +105,7 @@
   `static_col_names` in the `.pt` checkpoint so column validation
   survives a save/reload cycle.
 
-## survivehrR 0.5.0
+## RSurvivEHR 0.5.0
 
 - Updated vignette **“Model architecture & parameter reference”** with
   the official hyperparameter table from Gadd et al. (2025). Now
@@ -109,7 +120,7 @@
 - Added separate `cfg_pretrain` and `cfg_finetune` recommended configs
   for HPC / large-dataset users.
 
-## survivehrR 0.4.0
+## RSurvivEHR 0.4.0
 
 - Fixed R CMD check WARNING: added missing `man/survivehr_setup.Rd` by
   running `devtools::document()`. The package now passes `R CMD check`
@@ -128,7 +139,7 @@
   [`pkgdown::build_site()`](https://pkgdown.r-lib.org/reference/build_site.html)
   error *“1 topic missing from index: ‘survivehr_setup’”*.
 
-## survivehrR 0.3.0
+## RSurvivEHR 0.3.0
 
 - Replaced the simple dot-per-batch progress indicator in
   `_run_train_loop` with a real-time inline progress bar showing epoch
@@ -145,11 +156,11 @@
   Single-risk), with a comparison table and updated prediction examples
   for both models.
 
-## survivehrR 0.2.0
+## RSurvivEHR 0.2.0
 
 - Added
   [`survivehr_setup()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_setup.md)
-  to create and populate the `survivehrR` Python virtual environment.
+  to create and populate the `RSurvivEHR` Python virtual environment.
   Works on macOS, Windows, and Linux. Added to `NAMESPACE` exports and
   `R/setup.R`.
 - Added `transformers` to the list of required Python packages installed
@@ -183,7 +194,7 @@
   environment has not been set up (directs user to
   [`survivehr_setup()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_setup.md)).
 
-## survivehrR 0.1.0
+## RSurvivEHR 0.1.0
 
 ### First public release
 

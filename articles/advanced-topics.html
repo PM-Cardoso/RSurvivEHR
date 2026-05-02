@@ -5,12 +5,17 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Advanced topics • survivehrR</title>
+<title>Advanced topics • RSurvivEHR</title>
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/Inter-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/JetBrains_Mono-0.4.10/font.css" rel="stylesheet">
+<link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Advanced topics">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -18,7 +23,7 @@
 
     <nav class="navbar navbar-expand-lg fixed-top bg-primary" data-bs-theme="dark" aria-label="Site navigation"><div class="container">
 
-    <a class="navbar-brand me-2" href="../index.html">survivehrR</a>
+    <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
     <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.2</small>
 
@@ -39,18 +44,10 @@
     <li><a class="dropdown-item" href="../articles/model-architecture.html">Model architecture &amp; parameter reference</a></li>
   </ul>
 </li>
-<li class="nav-item dropdown">
-  <button class="nav-link dropdown-toggle" type="button" id="dropdown-news" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">News</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-news">
-<li><h6 class="dropdown-header" data-toc-skip>Releases</h6></li>
-    <li><a class="dropdown-item" href="../news/index.html">Version 0.1.0</a></li>
-    <li><hr class="dropdown-divider"></li>
-    <li><a class="dropdown-item" href="../news/index.html">Changelog</a></li>
-  </ul>
-</li>
+<li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/PM-Cardoso/SurvivEHR" aria-label="GitHub"><span class="fa fab fa-github"></span></a></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/PM-Cardoso/RSurvivEHR" aria-label="GitHub"><span class="fa fab fa-github"></span></a></li>
       </ul>
 </div>
 
@@ -67,7 +64,7 @@
       <h1>Advanced topics</h1>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/PM-Cardoso/SurvivEHR/blob/main/vignettes/advanced-topics.Rmd" class="external-link"><code>vignettes/advanced-topics.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/PM-Cardoso/RSurvivEHR/blob/main/vignettes/advanced-topics.Rmd" class="external-link"><code>vignettes/advanced-topics.Rmd</code></a></small>
       <div class="d-none name"><code>advanced-topics.Rmd</code></div>
     </div>
 
@@ -76,7 +73,7 @@
 <div class="section level2">
 <h2 id="token-policy-in-depth">Token policy in depth<a class="anchor" aria-label="anchor" href="#token-policy-in-depth"></a>
 </h2>
-<p>survivehrR constructs the event vocabulary as:</p>
+<p>RSurvivEHR constructs the event vocabulary as:</p>
 <pre><code>Index  Token
 ─────  ─────────────────────────────────────────
   0    &lt;PAD&gt;   always present; padding_idx for the embedding layer
@@ -198,7 +195,7 @@ model weights are comparable.</p>
 <p>All functions accept the uppercase column names used by FastEHR:</p>
 <table class="table">
 <thead><tr class="header">
-<th>survivehrR name</th>
+<th>RSurvivEHR name</th>
 <th>FastEHR alias</th>
 </tr></thead>
 <tbody>
@@ -242,7 +239,7 @@ model weights are comparable.</p>
 <p>This section walks through a complete analysis on 6 synthetic
 patients.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://pm-cardoso.github.io/RSurvivEHR/">survivehrR</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://pm-cardoso.github.io/RSurvivEHR/">RSurvivEHR</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># ── 1. Data ─────────────────────────────────────────────────────────────────</span></span>
 <span><span class="va">all_events</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
@@ -333,7 +330,7 @@ patients.</p>
 <div class="section level2">
 <h2 id="python-environment-setup">Python environment setup<a class="anchor" aria-label="anchor" href="#python-environment-setup"></a>
 </h2>
-<p>survivehrR uses <code>reticulate</code> to call the vendored backend.
+<p>RSurvivEHR uses <code>reticulate</code> to call the vendored backend.
 The first call to any training function will attempt to import PyTorch,
 pandas, and numpy. If these are not available in the current Python
 environment, install them:</p>

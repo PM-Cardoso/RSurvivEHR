@@ -2,7 +2,7 @@
 
 ## Token policy in depth
 
-survivehrR constructs the event vocabulary as:
+RSurvivEHR constructs the event vocabulary as:
 
     Index  Token
     ─────  ─────────────────────────────────────────
@@ -119,7 +119,7 @@ are comparable.
 
 All functions accept the uppercase column names used by FastEHR:
 
-| survivehrR name | FastEHR alias                     |
+| RSurvivEHR name | FastEHR alias                     |
 |-----------------|-----------------------------------|
 | `patient_id`    | `PATIENT_ID`                      |
 | `event`         | `EVENT`                           |
@@ -140,7 +140,7 @@ This section walks through a complete analysis on 6 synthetic patients.
 
 ``` r
 
-library(survivehrR)
+library(RSurvivEHR)
 
 # ── 1. Data ─────────────────────────────────────────────────────────────────
 all_events <- data.frame(
@@ -232,7 +232,7 @@ unlink(tmp)
 
 ## Python environment setup
 
-survivehrR uses `reticulate` to call the vendored backend. The first
+RSurvivEHR uses `reticulate` to call the vendored backend. The first
 call to any training function will attempt to import PyTorch, pandas,
 and numpy. If these are not available in the current Python environment,
 install them:

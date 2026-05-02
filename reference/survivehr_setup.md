@@ -1,6 +1,6 @@
 # Set up the SurvivEHR Python environment
 
-Creates a dedicated Python virtual environment named `"survivehrR"` and
+Creates a dedicated Python virtual environment named `"RSurvivEHR"` and
 installs all required packages. Only needs to be called **once** after
 installing the R package. Subsequent calls skip reinstallation unless
 `force = TRUE`.
@@ -8,14 +8,14 @@ installing the R package. Subsequent calls skip reinstallation unless
 ## Usage
 
 ``` r
-survivehr_setup(envname = "survivehrR", force = FALSE, python = NULL)
+survivehr_setup(envname = "RSurvivEHR", force = FALSE, python = NULL)
 ```
 
 ## Arguments
 
 - envname:
 
-  Name of the virtualenv to create/use. Default `"survivehrR"`.
+  Name of the virtualenv to create/use. Default `"RSurvivEHR"`.
 
 - force:
 

@@ -1,6 +1,6 @@
-# Getting started with survivehrR
+# Getting started with RSurvivEHR
 
-**survivehrR** trains transformer-based survival models on longitudinal
+**RSurvivEHR** trains transformer-based survival models on longitudinal
 EHR data directly from R, with no Python experience required. The full
 pipeline is:
 
@@ -34,9 +34,9 @@ Then set up the Python backend (only needed once):
 
 ``` r
 
-library(survivehrR)
+library(RSurvivEHR)
 
-# Creates the "survivehrR" Python virtualenv and installs all dependencies.
+# Creates the "RSurvivEHR" Python virtualenv and installs all dependencies.
 # Safe to call repeatedly — it is a no-op if the environment already exists.
 survivehr_setup()
 ```

@@ -1,6 +1,6 @@
 # Model architecture and parameter reference
 
-This vignette explains every configurable parameter in **survivehrR**,
+This vignette explains every configurable parameter in **RSurvivEHR**,
 why it exists, what value the original SurvivEHR authors used in their
 UK primary-care study (7.6 billion events, 23 million patients), and
 guidelines for choosing a value for your own data.
@@ -75,7 +75,7 @@ and GPU resources.
 
 ``` r
 
-library(survivehrR)
+library(RSurvivEHR)
 
 cfg <- survivehr_config(
   # -- Transformer architecture -------------------------------------------
@@ -115,7 +115,7 @@ cfg <- survivehr_config(
 
 ### `block_size` – context window
 
-| survivehrR default | Upstream pre-training | Upstream fine-tuning | Notes |
+| RSurvivEHR default | Upstream pre-training | Upstream fine-tuning | Notes |
 |----|----|----|----|
 | `128` | `256` | `512` | Fine-tuning uses a longer window to include more history. |
 
@@ -138,7 +138,7 @@ at the start.
 
 ### `n_layer` – number of transformer blocks
 
-| survivehrR default | Upstream (both stages) |
+| RSurvivEHR default | Upstream (both stages) |
 |--------------------|------------------------|
 | `4`                | `6`                    |
 
@@ -150,7 +150,7 @@ representational capacity but requires more data and compute.
 
 ### `n_head` – number of attention heads
 
-| survivehrR default | Upstream (both stages) | Notes |
+| RSurvivEHR default | Upstream (both stages) | Notes |
 |----|----|----|
 | `4` | `6` | Must divide `n_embd` evenly (384 / 6 = 64 per head). |
 
@@ -158,7 +158,7 @@ representational capacity but requires more data and compute.
 
 ### `n_embd` – embedding / hidden dimension
 
-| survivehrR default | Upstream (both stages) | Notes |
+| RSurvivEHR default | Upstream (both stages) | Notes |
 |----|----|----|
 | `256` | `384` | Total params ~= 12 x n_layer x n_embd^2. |
 
@@ -170,7 +170,7 @@ block is `4 x n_embd`. Common sizes: `64` (debug), `128` (tiny), `256`
 
 ### `dropout`
 
-| survivehrR default | Upstream |
+| RSurvivEHR default | Upstream |
 |--------------------|----------|
 | `0.0`              | `0.0`    |
 
@@ -198,7 +198,7 @@ to set the head learning rate.
 
 ### `epochs`
 
-| survivehrR default | Upstream pre-training | Upstream fine-tuning |
+| RSurvivEHR default | Upstream pre-training | Upstream fine-tuning |
 |--------------------|-----------------------|----------------------|
 | `1`                | `10`                  | `20`                 |
 
@@ -208,7 +208,7 @@ Scale up proportionally for smaller datasets.
 
 ### `batch_size`
 
-| survivehrR default | Upstream pre-training | Upstream fine-tuning |
+| RSurvivEHR default | Upstream pre-training | Upstream fine-tuning |
 |--------------------|-----------------------|----------------------|
 | `16`               | `64`                  | `512`                |
 
@@ -238,7 +238,7 @@ Early stopping is **disabled** during pre-training and **enabled**
 | `"single-risk"` | Neural-ODE head with a single ODE. Used when only one endpoint is of interest. |
 
 The upstream config uses the abbreviated codes `"cr"` and `"sr"` – both
-are also accepted by survivehrR.
+are also accepted by RSurvivEHR.
 
 ------------------------------------------------------------------------
 
@@ -257,7 +257,7 @@ also learned measurement magnitudes (e.g. BMI, blood pressure).
 
 ### `include_unk`
 
-| survivehrR default | Notes                                  |
+| RSurvivEHR default | Notes                                  |
 |--------------------|----------------------------------------|
 | `TRUE`             | Always recommended for production use. |
 
@@ -268,7 +268,7 @@ prediction time is silently mapped to `<UNK>`.
 
 ### `include_cls_sep`
 
-| survivehrR default | Notes |
+| RSurvivEHR default | Notes |
 |----|----|
 | `FALSE` | The original SurvivEHR model does not use CLS/SEP tokens. |
 
@@ -303,7 +303,7 @@ All raw ages are divided by `time_scale` before entering the model.
 
 ### NeoGPT block
 
-survivehrR always uses the **NeoGPT** block (`block_type = "Neo"`):
+RSurvivEHR always uses the **NeoGPT** block (`block_type = "Neo"`):
 
 - **Rotary Position Embeddings (RoPE)** inside attention.
 - **SwiGLU** activation in the MLP.
