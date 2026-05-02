@@ -1,3 +1,25 @@
+# RSurvivEHR 0.7.3
+
+* **README quick start is now fully self-contained**: `events`,
+  `static_covariates`, and `targets` data frames are defined inline (5 synthetic
+  patients matching the Getting Started vignette) so the code block runs
+  without error on copy-paste.  The `survivehr_finetune()` call now correctly
+  filters out the outcome event (`CVD`) from the context to prevent data
+  leakage, and `survivehr_validate_targets()` is included.
+* **Getting Started vignette: fixed section numbering**: subsections
+  `### 4a Competing-risk fine-tuning` and `### 4b Single-risk fine-tuning`
+  were incorrectly nested inside `## 5 Fine-tuning`; renamed to `### 5a` and
+  `### 5b` to match the parent section number.
+* **Getting Started vignette: added References section** citing Gadd et al.
+  (2025) with a DOI link.
+* **External links now open in a new tab** on the pkgdown site: the website
+  URL, issues link, and documentation section links in `README.md`, as well as
+  the upstream config YAML links and DOI reference in
+  `vignettes/model-architecture.Rmd`, are now HTML `<a target="_blank">` tags.
+* **Citation section added to README**: directs users to Gadd et al. (2025),
+  *SurvivEHR: Transformer-based survival analysis on electronic health records*,
+  medRxiv, <https://doi.org/10.1101/2025.08.04.25332916>.
+
 # RSurvivEHR 0.7.2
 
 * **Package repository renamed to `RSurvivEHR`**: installation instructions

@@ -9,8 +9,8 @@
 
 > Transformer-based survival analysis on Electronic Health Records — from R, with no Python experience required.
 
-📦 **Website**: <https://pm-cardoso.github.io/RSurvivEHR/>  
-🐛 **Issues**: <https://github.com/PM-Cardoso/RSurvivEHR/issues>
+📦 **Website**: <a href="https://pm-cardoso.github.io/RSurvivEHR/" target="_blank" rel="noopener noreferrer">https://pm-cardoso.github.io/RSurvivEHR/</a>  
+🐛 **Issues**: <a href="https://github.com/PM-Cardoso/RSurvivEHR/issues" target="_blank" rel="noopener noreferrer">https://github.com/PM-Cardoso/RSurvivEHR/issues</a>
 
 `RSurvivEHR` wraps the **SurvivEHR** competing-risk transformer so you can pre-train on
 longitudinal clinical event sequences, fine-tune on labelled outcomes, and generate patient-level
@@ -77,11 +77,44 @@ new events ────────▶ survivehr_predict()  ──▶ per-patien
 ```r
 library(RSurvivEHR)
 
-# 1. Validate inputs
+# ── Sample data (5 patients, matching the Getting Started vignette) ───────────
+events <- data.frame(
+  patient_id = c(1,1,1,1,1, 2,2,2,2,2, 3,3,3,3,3, 4,4,4,4,4, 5,5,5,5,5,5),
+  event      = c("HYPERTENSION","STATIN","T2D","BP_CHECK","METFORMIN",
+                 "T2D","METFORMIN","HBA1C","HYPERTENSION","STATIN",
+                 "STATIN","T2D","BP_CHECK","HBA1C","METFORMIN",
+                 "HYPERTENSION","AMLODIPINE","BP_CHECK","STATIN","T2D",
+                 "T2D","STATIN","HBA1C","HYPERTENSION","METFORMIN","CVD"),
+  age        = c(50.0,50.5,52.0,52.1,52.3,
+                 45.0,45.3,46.0,47.5,48.0,
+                 58.0,60.1,61.5,62.0,62.3,
+                 55.0,55.4,56.0,57.2,58.0,
+                 48.0,48.6,49.0,49.1,50.5,51.2),
+  value      = c(NA,NA,NA,152,NA,  NA,NA,61,NA,NA,  NA,NA,145,58,NA,
+                 NA,NA,168,NA,NA,  NA,NA,67,NA,NA,NA)
+)
+
+static_covariates <- data.frame(
+  patient_id    = 1:5,
+  SEX           = c("M","F","M","F","M"),
+  ETHNICITY     = c("White","Asian","White","White","Black"),
+  IMD           = c(3L,1L,5L,2L,4L),
+  YEAR_OF_BIRTH = c(1965L,1972L,1955L,1960L,1968L)
+)
+
+# Labelled outcomes: patient 4 developed T2D, patient 5 developed CVD
+targets <- data.frame(
+  patient_id   = c(4L,  5L),
+  target_event = c("T2D", "CVD"),
+  target_age   = c(58.0, 51.2)
+)
+
+# ── 1. Validate inputs ────────────────────────────────────────────────────────
 survivehr_validate_events(events)
 survivehr_validate_static(static_covariates)
+survivehr_validate_targets(targets)
 
-# 2. Configure
+# ── 2. Configure ──────────────────────────────────────────────────────────────
 cfg <- survivehr_config(
   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
   epochs = 10,     batch_size = 16,
@@ -89,24 +122,25 @@ cfg <- survivehr_config(
   time_scale = 1.0   # ages in years; use 1825.0 for DAYS_SINCE_BIRTH
 )
 
-# 3. Pre-train the backbone
+# ── 3. Pre-train the backbone ─────────────────────────────────────────────────
 pt_model <- survivehr_pretrain(events, static_covariates, cfg)
 survivehr_save_model(pt_model, "backbone.pt")
 
-# 4. Fine-tune on labelled outcomes
+# ── 4. Fine-tune on labelled outcomes ─────────────────────────────────────────
+# Remove CVD from context to prevent data leakage for patient 5
 ft_model <- survivehr_finetune(
-  events            = events,
-  targets           = targets,          # patient_id, target_event, target_age
-  outcomes          = c("CVD", "T2D"),
+  events            = events[events$event != "CVD", ],
+  targets           = targets,
+  outcomes          = c("T2D", "CVD"),
   risk_model        = "competing-risk",
   static_covariates = static_covariates,
   config            = cfg,
   pretrained_model  = pt_model
 )
 
-# 5. Predict
+# ── 5. Predict ────────────────────────────────────────────────────────────────
 preds <- survivehr_predict(ft_model, events, static_covariates)
-# Returns: patient_id, CVD_cdf_last, CVD_auc, T2D_cdf_last, T2D_auc
+# Columns: patient_id, T2D_cdf_last, T2D_auc, CVD_cdf_last, CVD_auc
 ```
 
 ---
@@ -129,8 +163,18 @@ preds <- survivehr_predict(ft_model, events, static_covariates)
 ## Documentation
 
 Full documentation, vignettes, and configuration reference at  
-**<https://pm-cardoso.github.io/RSurvivEHR/>**
+**<a href="https://pm-cardoso.github.io/RSurvivEHR/" target="_blank" rel="noopener noreferrer">https://pm-cardoso.github.io/RSurvivEHR/</a>**
 
-- [Getting started](https://pm-cardoso.github.io/RSurvivEHR/articles/getting-started.html) — step-by-step walkthrough of the full pipeline
-- [Advanced topics](https://pm-cardoso.github.io/RSurvivEHR/articles/advanced-topics.html) — token policy, age normalisation, static covariate encoding, FastEHR aliases, full worked example
-- [Model architecture & parameter reference](https://pm-cardoso.github.io/RSurvivEHR/articles/model-architecture.html) — every `survivehr_config()` parameter with recommended values
+- <a href="https://pm-cardoso.github.io/RSurvivEHR/articles/getting-started.html" target="_blank" rel="noopener noreferrer">Getting started</a> — step-by-step walkthrough of the full pipeline
+- <a href="https://pm-cardoso.github.io/RSurvivEHR/articles/advanced-topics.html" target="_blank" rel="noopener noreferrer">Advanced topics</a> — token policy, age normalisation, static covariate encoding, FastEHR aliases, full worked example
+- <a href="https://pm-cardoso.github.io/RSurvivEHR/articles/model-architecture.html" target="_blank" rel="noopener noreferrer">Model architecture & parameter reference</a> — every `survivehr_config()` parameter with recommended values
+
+---
+
+## Citation
+
+If you use RSurvivEHR in your research, please cite the original SurvivEHR paper:
+
+> Gadd, C. et al. (2025). *SurvivEHR: Transformer-based survival analysis on
+> electronic health records*. medRxiv.
+> <a href="https://doi.org/10.1101/2025.08.04.25332916" target="_blank" rel="noopener noreferrer">doi:10.1101/2025.08.04.25332916</a>

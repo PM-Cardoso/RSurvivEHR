@@ -22,9 +22,9 @@ guidelines for choosing a value for your own data.
 
 Upstream defaults are taken directly from the published hyperparameter table
 in Gadd et al. (2025) and from the upstream configuration files
-[`config_CompetingRisk11M.yaml`](https://github.com/cwlgadd/SurvivEHR/blob/main/examples/modelling/SurvivEHR/confs/config_CompetingRisk11M.yaml)
+<a href="https://github.com/cwlgadd/SurvivEHR/blob/main/examples/modelling/SurvivEHR/confs/config_CompetingRisk11M.yaml" target="_blank" rel="noopener noreferrer"><code>config_CompetingRisk11M.yaml</code></a>
 and
-[`config_SingleRisk.yaml`](https://github.com/cwlgadd/SurvivEHR/blob/main/examples/modelling/SurvivEHR/confs/config_SingleRisk.yaml)
+<a href="https://github.com/cwlgadd/SurvivEHR/blob/main/examples/modelling/SurvivEHR/confs/config_SingleRisk.yaml" target="_blank" rel="noopener noreferrer"><code>config_SingleRisk.yaml</code></a>
 in the `cwlgadd/SurvivEHR` repository.
 
 ---
@@ -431,4 +431,5 @@ cfg_finetune <- survivehr_config(
 ## References
 
 Gadd, C. et al. (2025). *SurvivEHR: Transformer-based survival analysis on
-electronic health records*. medRxiv. <https://doi.org/10.1101/2025.08.04.25332916>
+electronic health records*. medRxiv.
+<a href="https://doi.org/10.1101/2025.08.04.25332916" target="_blank" rel="noopener noreferrer">doi:10.1101/2025.08.04.25332916</a>
