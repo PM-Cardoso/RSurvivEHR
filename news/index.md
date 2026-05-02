@@ -1,5 +1,18 @@
 # Changelog
 
+## RSurvivEHR 0.7.4
+
+- **Python 3.8 compatibility fix (type annotations)**: two vendored
+  Python files used PEP 585 built-in generic annotations (`list[int]`)
+  that are only valid on Python 3.9+. Replaced with `typing.List[int]`
+  (added `List` to the `typing` import) in:
+  - `src/modules/head_layers/survival/single_risk.py` —
+    `target_indicies: list[int]`
+  - `src/modules/head_layers/value_layers.py` — `Optional[list[int]]`
+    This resolves the `TypeError: 'type' object is not subscriptable`
+    crash on HPC systems running Python 3.8 (e.g. EasyBuild foss-2021b
+    toolchain).
+
 ## RSurvivEHR 0.7.3
 
 - **README quick start is now fully self-contained**: `events`,

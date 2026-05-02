@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,6 +37,17 @@
       <small>Source: <a href="https://github.com/PM-Cardoso/RSurvivEHR/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.7.4" id="rsurvivehr-074">RSurvivEHR 0.7.4<a class="anchor" aria-label="anchor" href="#rsurvivehr-074"></a></h2>
+<ul><li>
+<strong>Python 3.8 compatibility fix (type annotations)</strong>: two vendored Python files used PEP 585 built-in generic annotations (<code>list[int]</code>) that are only valid on Python 3.9+. Replaced with <code>typing.List[int]</code> (added <code>List</code> to the <code>typing</code> import) in:
+<ul><li>
+<code>src/modules/head_layers/survival/single_risk.py</code> — <code>target_indicies: list[int]</code>
+</li>
+<li>
+<code>src/modules/head_layers/value_layers.py</code> — <code>Optional[list[int]]</code> This resolves the <code>TypeError: 'type' object is not subscriptable</code> crash on HPC systems running Python 3.8 (e.g. EasyBuild foss-2021b toolchain).</li>
+</ul></li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.7.3" id="rsurvivehr-073">RSurvivEHR 0.7.3<a class="anchor" aria-label="anchor" href="#rsurvivehr-073"></a></h2>
 <ul><li>
