@@ -77,7 +77,6 @@ survivehr_setup()   # creates a dedicated virtualenv — safe to call repeatedly
 
 ``` r
 
-library(RSurvivEHR)
 
 # ── Sample data (5 patients, matching the Getting Started vignette) ───────────
 events <- data.frame(

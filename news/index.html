@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,6 +37,13 @@
       <small>Source: <a href="https://github.com/PM-Cardoso/RSurvivEHR/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.7.5" id="rsurvivehr-075">RSurvivEHR 0.7.5<a class="anchor" aria-label="anchor" href="#rsurvivehr-075"></a></h2>
+<ul><li>
+<strong>CPU/GPU device visibility</strong>: the training start-up banner now prints a human-readable device string including the GPU model when CUDA is available (e.g. <code>device=cuda:0 (Tesla V100-SXM2-16GB)</code> vs <code>device=cpu</code>). The <code>[survivehrR]</code> prefix in that message has been corrected to <code>[RSurvivEHR]</code>.</li>
+<li>
+<strong><code>device</code> field in model bundles</strong>: the named list returned by <code><a href="../reference/survivehr_pretrain.html">survivehr_pretrain()</a></code> and <code><a href="../reference/survivehr_finetune.html">survivehr_finetune()</a></code> now includes a <code>device</code> element (a plain string such as <code>"cpu"</code> or <code>"cuda:0"</code>). The same field is persisted by <code><a href="../reference/survivehr_save_model.html">survivehr_save_model()</a></code> and restored by <code><a href="../reference/survivehr_load_model.html">survivehr_load_model()</a></code>.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.7.4" id="rsurvivehr-074">RSurvivEHR 0.7.4<a class="anchor" aria-label="anchor" href="#rsurvivehr-074"></a></h2>
 <ul><li>

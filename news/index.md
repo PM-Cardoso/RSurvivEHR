@@ -1,5 +1,22 @@
 # Changelog
 
+## RSurvivEHR 0.7.5
+
+- **CPU/GPU device visibility**: the training start-up banner now prints
+  a human-readable device string including the GPU model when CUDA is
+  available (e.g. `device=cuda:0 (Tesla V100-SXM2-16GB)` vs
+  `device=cpu`). The `[survivehrR]` prefix in that message has been
+  corrected to `[RSurvivEHR]`.
+- **`device` field in model bundles**: the named list returned by
+  [`survivehr_pretrain()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_pretrain.md)
+  and
+  [`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md)
+  now includes a `device` element (a plain string such as `"cpu"` or
+  `"cuda:0"`). The same field is persisted by
+  [`survivehr_save_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.md)
+  and restored by
+  [`survivehr_load_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_load_model.md).
+
 ## RSurvivEHR 0.7.4
 
 - **Python 3.8 compatibility fix (type annotations)**: two vendored
