@@ -5,7 +5,8 @@
 #' @param config list from `survivehr_config()`.
 #' @param event_vocab optional named integer map to keep fixed tokenization.
 #' @return A named list (model bundle) with elements `model`, `event_vocab`,
-#'   `inv_vocab`, `config`, `time_scale`, and `token_policy`.
+#'   `inv_vocab`, `config`, `time_scale`, `token_policy`, `history`, and
+#'   `device` (a string such as `"cpu"` or `"cuda:0"`).
 #' @export
 #' @examples
 #' \dontrun{
@@ -46,7 +47,8 @@ survivehr_pretrain <- function(events,
 #' @param config list from `survivehr_config()`.
 #' @param pretrained_model optional model handle from `survivehr_pretrain()`.
 #' @param event_vocab optional named integer map to keep fixed tokenization.
-#' @return A named list (fine-tuned model bundle). Pass to `survivehr_predict()`
+#' @return A named list (fine-tuned model bundle) with an additional `device`
+#'   field (e.g. `"cpu"` or `"cuda:0"`). Pass to `survivehr_predict()`
 #'   or `survivehr_save_model()`.
 #' @export
 #' @examples

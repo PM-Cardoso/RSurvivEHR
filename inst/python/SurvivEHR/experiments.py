@@ -1,5 +1,5 @@
 """
-Experiment wrappers for the survivehrR R-package backend.
+Experiment wrappers for the RSurvivEHR R-package backend.
 
 CausalExperiment   – wraps SurvStreamGPTForCausalModelling with a dict-batch
                      interface expected by survivehr_backend._run_train_loop.

@@ -75,7 +75,6 @@ new events ────────▶ survivehr_predict()  ──▶ per-patien
 ## Quick start
 
 ```r
-library(RSurvivEHR)
 
 # ── Sample data (5 patients, matching the Getting Started vignette) ───────────
 events <- data.frame(

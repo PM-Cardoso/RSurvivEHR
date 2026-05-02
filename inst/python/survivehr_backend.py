@@ -609,8 +609,15 @@ def _run_train_loop(model: torch.nn.Module,
     history: List[float] = []
     BAR_WIDTH  = 20
 
-    print(f"[survivehrR] {label}: {n_epochs} epoch(s), "
-          f"{n_batches} batch(es)/epoch, device={device}", flush=True)
+    # Build a human-readable device string, e.g. "cuda:0 (Tesla V100-SXM2-16GB)" or "cpu"
+    if device.type == "cuda" and torch.cuda.is_available():
+        gpu_name = torch.cuda.get_device_name(device)
+        device_str = f"{device} ({gpu_name})"
+    else:
+        device_str = str(device)
+
+    print(f"[RSurvivEHR] {label}: {n_epochs} epoch(s), "
+          f"{n_batches} batch(es)/epoch, device={device_str}", flush=True)
 
     for epoch in range(n_epochs):
         running   = 0.0
@@ -705,6 +712,7 @@ def train_pretrain_model(events_df: pd.DataFrame,
         "static_raw_cols": built.static_raw_cols,
         "static_col_names": built.static_col_names,
         "history": history,
+        "device": str(device),
     }
 
 
@@ -833,6 +841,7 @@ def train_finetune_model(events_df: pd.DataFrame,
         "static_raw_cols": built.static_raw_cols,
         "static_col_names": built.static_col_names,
         "history": history,
+        "device": str(device),
     }
 
 
@@ -936,6 +945,7 @@ def save_model_bundle(model_bundle: Dict[str, Any], path: str) -> None:
         "token_policy": model_bundle.get("token_policy", _token_policy_from_config()),
         "static_raw_cols": model_bundle.get("static_raw_cols", None),
         "static_col_names": model_bundle.get("static_col_names", None),
+        "device": model_bundle.get("device", "cpu"),
     }
     torch.save(payload, path)
 
@@ -972,4 +982,5 @@ def load_model_bundle(path: str) -> Dict[str, Any]:
         "token_policy": payload.get("token_policy", _token_policy_from_config()),
         "static_raw_cols": payload.get("static_raw_cols", None),
         "static_col_names": payload.get("static_col_names", None),
+        "device": payload.get("device", "cpu"),
     }
