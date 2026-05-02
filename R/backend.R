@@ -4,7 +4,7 @@
 .onLoad <- function(libname, pkgname) {
   # Flush Python stdout/stderr immediately so training progress appears live.
   Sys.setenv(PYTHONUNBUFFERED = "1")
-  .activate_survivehr_env("survivehrR")
+  .activate_survivehr_env("RSurvivEHR")
 }
 
 .survivehr_backend <- local({
@@ -16,13 +16,13 @@
     }
 
     # Ensure the right Python is active.
-    .activate_survivehr_env("survivehrR")
+    .activate_survivehr_env("RSurvivEHR")
 
     # Give an actionable error if the Python environment has not been set up.
     if (!reticulate::py_module_available("torch")) {
       stop(
         "Required Python packages are not installed.\n",
-        "Run `survivehrR::survivehr_setup()` once to create the Python ",
+        "Run `RSurvivEHR::survivehr_setup()` once to create the Python ",
         "environment, then restart R and try again.",
         call. = FALSE
       )
@@ -30,7 +30,7 @@
 
     # Locate inst/python — works both when the package is installed and when
     # it is loaded via devtools::load_all() / pkgload from the repo root.
-    installed_path <- system.file("python", package = "survivehrR")
+    installed_path <- system.file("python", package = "RSurvivEHR")
     backend_path <- if (nzchar(installed_path) && dir.exists(installed_path)) {
       installed_path
     } else {
@@ -40,7 +40,7 @@
 
     if (!dir.exists(backend_path)) {
       stop(
-        "Could not locate `inst/python` for survivehrR backend.\n",
+        "Could not locate `inst/python` for RSurvivEHR backend.\n",
         "Searched: ", backend_path,
         call. = FALSE
       )

@@ -1,4 +1,4 @@
 library(testthat)
-library(survivehrR)
+library(RSurvivEHR)
 
-test_check("survivehrR")
+test_check("RSurvivEHR")

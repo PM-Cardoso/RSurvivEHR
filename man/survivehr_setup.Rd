@@ -4,10 +4,10 @@
 \alias{survivehr_setup}
 \title{Set up the SurvivEHR Python environment}
 \usage{
-survivehr_setup(envname = "survivehrR", force = FALSE, python = NULL)
+survivehr_setup(envname = "RSurvivEHR", force = FALSE, python = NULL)
 }
 \arguments{
-\item{envname}{Name of the virtualenv to create/use.  Default \code{"survivehrR"}.}
+\item{envname}{Name of the virtualenv to create/use.  Default \code{"RSurvivEHR"}.}
 
 \item{force}{If \code{TRUE}, reinstall all packages even when the environment
 already exists.}
@@ -20,7 +20,7 @@ Invisibly returns the path to the Python executable in the
 new environment.
 }
 \description{
-Creates a dedicated Python virtual environment named \code{"survivehrR"} and
+Creates a dedicated Python virtual environment named \code{"RSurvivEHR"} and
 installs all required packages.  Only needs to be called \strong{once} after
 installing the R package.  Subsequent calls skip reinstallation unless
 \code{force = TRUE}.

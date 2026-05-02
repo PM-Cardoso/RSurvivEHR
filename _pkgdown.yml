@@ -3,21 +3,50 @@ url: https://pm-cardoso.github.io/RSurvivEHR/
 template:
   bootstrap: 5
   bootswatch: flatly
+  includes:
+    in_header: |
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   bslib:
-    primary: "#2c7bb6"
-    headings-font-weight: 600
+    primary: "#1d4ed8"
+    secondary: "#64748b"
+    success: "#16a34a"
+    info: "#0891b2"
+    base_font: {google: "Inter"}
+    code_font: {google: "JetBrains Mono"}
+    headings-font-weight: 700
+    border-radius: "0.5rem"
+    btn-border-radius: "0.375rem"
+    navbar-bg: "#0f172a"
+    navbar-light-color: "rgba(255,255,255,0.85)"
+    navbar-light-hover-color: "#ffffff"
+    navbar-light-active-color: "#ffffff"
+    navbar-light-brand-color: "#ffffff"
+    navbar-light-brand-hover-color: "#93c5fd"
+
+repo:
+  url:
+    home: https://github.com/PM-Cardoso/RSurvivEHR
+    source: https://github.com/PM-Cardoso/RSurvivEHR/blob/main/
+    issue: https://github.com/PM-Cardoso/RSurvivEHR/issues/
 
 home:
-  title: "survivehrR — Transformer Survival Models for EHR Data"
+  title: "RSurvivEHR — Transformer Survival Models for EHR Data"
   description: >
     An R interface to SurvivEHR: pre-train a competing-risk transformer on
     longitudinal EHR event sequences, fine-tune on labelled outcomes, and
     predict survival probabilities — all from plain R data frames.
   links:
     - text: "GitHub repository"
-      href: https://github.com/PM-Cardoso/SurvivEHR
+      href: https://github.com/PM-Cardoso/RSurvivEHR
     - text: "Report a bug"
-      href: https://github.com/PM-Cardoso/SurvivEHR/issues
+      href: https://github.com/PM-Cardoso/RSurvivEHR/issues
+
+footer:
+  structure:
+    left: developed_by
+    right: built_with
 
 navbar:
   structure:
@@ -38,7 +67,7 @@ navbar:
           href: articles/model-architecture.html
     github:
       icon: fab fa-github
-      href: https://github.com/PM-Cardoso/SurvivEHR
+      href: https://github.com/PM-Cardoso/RSurvivEHR
       aria-label: GitHub
 
 reference:
@@ -68,7 +97,3 @@ reference:
       - survivehr_validate_static
       - survivehr_validate_targets
 
-news:
-  releases:
-    - text: "Version 0.1.0"
-      href: news/index.html

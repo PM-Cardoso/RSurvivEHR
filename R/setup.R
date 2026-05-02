@@ -1,6 +1,6 @@
 #' Set up the SurvivEHR Python environment
 #'
-#' Creates a dedicated Python virtual environment named `"survivehrR"` and
+#' Creates a dedicated Python virtual environment named `"RSurvivEHR"` and
 #' installs all required packages.  Only needs to be called **once** after
 #' installing the R package.  Subsequent calls skip reinstallation unless
 #' `force = TRUE`.
@@ -8,7 +8,7 @@
 #' Works on macOS, Windows, and Linux.  An internet connection is required on
 #' first run so that pip can download the packages.
 #'
-#' @param envname Name of the virtualenv to create/use.  Default `"survivehrR"`.
+#' @param envname Name of the virtualenv to create/use.  Default `"RSurvivEHR"`.
 #' @param force   If `TRUE`, reinstall all packages even when the environment
 #'   already exists.
 #' @param python  Path to the Python executable.  `NULL` (default) lets
@@ -25,7 +25,7 @@
 #' # Force a clean reinstall:
 #' survivehr_setup(force = TRUE)
 #' }
-survivehr_setup <- function(envname = "survivehrR",
+survivehr_setup <- function(envname = "RSurvivEHR",
                             force   = FALSE,
                             python  = NULL) {
 
@@ -76,9 +76,9 @@ survivehr_setup <- function(envname = "survivehrR",
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-# Activate the survivehrR virtualenv when one exists.
+# Activate the RSurvivEHR virtualenv when one exists.
 # Called from .onLoad() and from .survivehr_backend() on every first call.
-.activate_survivehr_env <- function(envname = "survivehrR") {
+.activate_survivehr_env <- function(envname = "RSurvivEHR") {
   if (reticulate::virtualenv_exists(envname)) {
     reticulate::use_virtualenv(envname, required = FALSE)
   }
