@@ -424,4 +424,4 @@ cfg_finetune <- survivehr_config(
 
 Gadd, C. et al. (2025). *SurvivEHR: Transformer-based survival analysis
 on electronic health records*. medRxiv.
-<https://doi.org/10.1101/2025.08.04.25332916>
+[doi:10.1101/2025.08.04.25332916](https://doi.org/10.1101/2025.08.04.25332916)

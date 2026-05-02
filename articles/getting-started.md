@@ -231,7 +231,7 @@ survivehr_validate_static(static_all)
 # [OK] Static covariates: 5 patients, 4 covariate column(s): SEX, ETHNICITY, IMD, YEAR_OF_BIRTH.
 ```
 
-### 4a Competing-risk fine-tuning
+### 5a Competing-risk fine-tuning
 
 Use `risk_model = "competing-risk"` when two or more outcomes compete —
 i.e. the occurrence of one prevents the other from being observed. A
@@ -266,7 +266,7 @@ ft_cr <- survivehr_finetune(
 cat("Fine-tune (CR) loss history:", unlist(ft_cr$history), "\n")
 ```
 
-### 4b Single-risk fine-tuning
+### 5b Single-risk fine-tuning
 
 Use `risk_model = "single-risk"` when there is a single endpoint of
 interest and no competing events need to be modelled explicitly.
@@ -375,3 +375,11 @@ See the [Model
 architecture](https://pm-cardoso.github.io/RSurvivEHR/articles/model-architecture.md)
 article for the full configuration reference and the official Gadd et
 al. 2025 hyperparameter table.
+
+------------------------------------------------------------------------
+
+## References
+
+Gadd, C. et al. (2025). *SurvivEHR: Transformer-based survival analysis
+on electronic health records*. medRxiv.
+[doi:10.1101/2025.08.04.25332916](https://doi.org/10.1101/2025.08.04.25332916)

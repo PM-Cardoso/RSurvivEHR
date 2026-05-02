@@ -29,7 +29,7 @@
 
     <a class="navbar-brand me-2" href="index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -67,8 +67,8 @@
 <blockquote>
 <p>Transformer-based survival analysis on Electronic Health Records — from R, with no Python experience required.</p>
 </blockquote>
-<p>📦 <strong>Website</strong>: <a href="https://pm-cardoso.github.io/RSurvivEHR/" class="uri">https://pm-cardoso.github.io/RSurvivEHR/</a><br>
-🐛 <strong>Issues</strong>: <a href="https://github.com/PM-Cardoso/RSurvivEHR/issues" class="external-link uri">https://github.com/PM-Cardoso/RSurvivEHR/issues</a></p>
+<p>📦 <strong>Website</strong>: <a href="https://pm-cardoso.github.io/RSurvivEHR/" target="_blank" rel="noopener noreferrer">https://pm-cardoso.github.io/RSurvivEHR/</a><br>
+🐛 <strong>Issues</strong>: <a href="https://github.com/PM-Cardoso/RSurvivEHR/issues" target="_blank" rel="noopener noreferrer" class="external-link">https://github.com/PM-Cardoso/RSurvivEHR/issues</a></p>
 <p><code>RSurvivEHR</code> wraps the <strong>SurvivEHR</strong> competing-risk transformer so you can pre-train on longitudinal clinical event sequences, fine-tune on labelled outcomes, and generate patient-level survival predictions — all from plain R data frames. The Python backend is vendored inside the package and managed automatically via <code>reticulate</code>.</p>
 <hr>
 <div class="section level2">
@@ -151,11 +151,44 @@ new events ────────▶ survivehr_predict()  ──▶ per-patien
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://pm-cardoso.github.io/RSurvivEHR/">RSurvivEHR</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># 1. Validate inputs</span></span>
+<span><span class="co"># ── Sample data (5 patients, matching the Getting Started vignette) ───────────</span></span>
+<span><span class="va">events</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  patient_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>,<span class="fl">1</span>,<span class="fl">1</span>,<span class="fl">1</span>,<span class="fl">1</span>, <span class="fl">2</span>,<span class="fl">2</span>,<span class="fl">2</span>,<span class="fl">2</span>,<span class="fl">2</span>, <span class="fl">3</span>,<span class="fl">3</span>,<span class="fl">3</span>,<span class="fl">3</span>,<span class="fl">3</span>, <span class="fl">4</span>,<span class="fl">4</span>,<span class="fl">4</span>,<span class="fl">4</span>,<span class="fl">4</span>, <span class="fl">5</span>,<span class="fl">5</span>,<span class="fl">5</span>,<span class="fl">5</span>,<span class="fl">5</span>,<span class="fl">5</span><span class="op">)</span>,</span>
+<span>  event      <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"HYPERTENSION"</span>,<span class="st">"STATIN"</span>,<span class="st">"T2D"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"METFORMIN"</span>,</span>
+<span>                 <span class="st">"T2D"</span>,<span class="st">"METFORMIN"</span>,<span class="st">"HBA1C"</span>,<span class="st">"HYPERTENSION"</span>,<span class="st">"STATIN"</span>,</span>
+<span>                 <span class="st">"STATIN"</span>,<span class="st">"T2D"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"HBA1C"</span>,<span class="st">"METFORMIN"</span>,</span>
+<span>                 <span class="st">"HYPERTENSION"</span>,<span class="st">"AMLODIPINE"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"STATIN"</span>,<span class="st">"T2D"</span>,</span>
+<span>                 <span class="st">"T2D"</span>,<span class="st">"STATIN"</span>,<span class="st">"HBA1C"</span>,<span class="st">"HYPERTENSION"</span>,<span class="st">"METFORMIN"</span>,<span class="st">"CVD"</span><span class="op">)</span>,</span>
+<span>  age        <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">50.0</span>,<span class="fl">50.5</span>,<span class="fl">52.0</span>,<span class="fl">52.1</span>,<span class="fl">52.3</span>,</span>
+<span>                 <span class="fl">45.0</span>,<span class="fl">45.3</span>,<span class="fl">46.0</span>,<span class="fl">47.5</span>,<span class="fl">48.0</span>,</span>
+<span>                 <span class="fl">58.0</span>,<span class="fl">60.1</span>,<span class="fl">61.5</span>,<span class="fl">62.0</span>,<span class="fl">62.3</span>,</span>
+<span>                 <span class="fl">55.0</span>,<span class="fl">55.4</span>,<span class="fl">56.0</span>,<span class="fl">57.2</span>,<span class="fl">58.0</span>,</span>
+<span>                 <span class="fl">48.0</span>,<span class="fl">48.6</span>,<span class="fl">49.0</span>,<span class="fl">49.1</span>,<span class="fl">50.5</span>,<span class="fl">51.2</span><span class="op">)</span>,</span>
+<span>  value      <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="cn">NA</span>,<span class="cn">NA</span>,<span class="cn">NA</span>,<span class="fl">152</span>,<span class="cn">NA</span>,  <span class="cn">NA</span>,<span class="cn">NA</span>,<span class="fl">61</span>,<span class="cn">NA</span>,<span class="cn">NA</span>,  <span class="cn">NA</span>,<span class="cn">NA</span>,<span class="fl">145</span>,<span class="fl">58</span>,<span class="cn">NA</span>,</span>
+<span>                 <span class="cn">NA</span>,<span class="cn">NA</span>,<span class="fl">168</span>,<span class="cn">NA</span>,<span class="cn">NA</span>,  <span class="cn">NA</span>,<span class="cn">NA</span>,<span class="fl">67</span>,<span class="cn">NA</span>,<span class="cn">NA</span>,<span class="cn">NA</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">static_covariates</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  patient_id    <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">5</span>,</span>
+<span>  SEX           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span><span class="op">)</span>,</span>
+<span>  ETHNICITY     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"White"</span>,<span class="st">"Asian"</span>,<span class="st">"White"</span>,<span class="st">"White"</span>,<span class="st">"Black"</span><span class="op">)</span>,</span>
+<span>  IMD           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>,<span class="fl">1L</span>,<span class="fl">5L</span>,<span class="fl">2L</span>,<span class="fl">4L</span><span class="op">)</span>,</span>
+<span>  YEAR_OF_BIRTH <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1965L</span>,<span class="fl">1972L</span>,<span class="fl">1955L</span>,<span class="fl">1960L</span>,<span class="fl">1968L</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Labelled outcomes: patient 4 developed T2D, patient 5 developed CVD</span></span>
+<span><span class="va">targets</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  patient_id   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4L</span>,  <span class="fl">5L</span><span class="op">)</span>,</span>
+<span>  target_event <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"T2D"</span>, <span class="st">"CVD"</span><span class="op">)</span>,</span>
+<span>  target_age   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">58.0</span>, <span class="fl">51.2</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># ── 1. Validate inputs ────────────────────────────────────────────────────────</span></span>
 <span><span class="fu"><a href="reference/survivehr_validate_events.html">survivehr_validate_events</a></span><span class="op">(</span><span class="va">events</span><span class="op">)</span></span>
 <span><span class="fu"><a href="reference/survivehr_validate_static.html">survivehr_validate_static</a></span><span class="op">(</span><span class="va">static_covariates</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/survivehr_validate_targets.html">survivehr_validate_targets</a></span><span class="op">(</span><span class="va">targets</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># 2. Configure</span></span>
+<span><span class="co"># ── 2. Configure ──────────────────────────────────────────────────────────────</span></span>
 <span><span class="va">cfg</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/survivehr_config.html">survivehr_config</a></span><span class="op">(</span></span>
 <span>  block_size <span class="op">=</span> <span class="fl">64</span>, n_layer <span class="op">=</span> <span class="fl">2</span>, n_head <span class="op">=</span> <span class="fl">2</span>, n_embd <span class="op">=</span> <span class="fl">64</span>,</span>
 <span>  epochs <span class="op">=</span> <span class="fl">10</span>,     batch_size <span class="op">=</span> <span class="fl">16</span>,</span>
@@ -163,24 +196,25 @@ new events ────────▶ survivehr_predict()  ──▶ per-patien
 <span>  time_scale <span class="op">=</span> <span class="fl">1.0</span>   <span class="co"># ages in years; use 1825.0 for DAYS_SINCE_BIRTH</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># 3. Pre-train the backbone</span></span>
+<span><span class="co"># ── 3. Pre-train the backbone ─────────────────────────────────────────────────</span></span>
 <span><span class="va">pt_model</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/survivehr_pretrain.html">survivehr_pretrain</a></span><span class="op">(</span><span class="va">events</span>, <span class="va">static_covariates</span>, <span class="va">cfg</span><span class="op">)</span></span>
 <span><span class="fu"><a href="reference/survivehr_save_model.html">survivehr_save_model</a></span><span class="op">(</span><span class="va">pt_model</span>, <span class="st">"backbone.pt"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># 4. Fine-tune on labelled outcomes</span></span>
+<span><span class="co"># ── 4. Fine-tune on labelled outcomes ─────────────────────────────────────────</span></span>
+<span><span class="co"># Remove CVD from context to prevent data leakage for patient 5</span></span>
 <span><span class="va">ft_model</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/survivehr_finetune.html">survivehr_finetune</a></span><span class="op">(</span></span>
-<span>  events            <span class="op">=</span> <span class="va">events</span>,</span>
-<span>  targets           <span class="op">=</span> <span class="va">targets</span>,          <span class="co"># patient_id, target_event, target_age</span></span>
-<span>  outcomes          <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"CVD"</span>, <span class="st">"T2D"</span><span class="op">)</span>,</span>
+<span>  events            <span class="op">=</span> <span class="va">events</span><span class="op">[</span><span class="va">events</span><span class="op">$</span><span class="va">event</span> <span class="op">!=</span> <span class="st">"CVD"</span>, <span class="op">]</span>,</span>
+<span>  targets           <span class="op">=</span> <span class="va">targets</span>,</span>
+<span>  outcomes          <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"T2D"</span>, <span class="st">"CVD"</span><span class="op">)</span>,</span>
 <span>  risk_model        <span class="op">=</span> <span class="st">"competing-risk"</span>,</span>
 <span>  static_covariates <span class="op">=</span> <span class="va">static_covariates</span>,</span>
 <span>  config            <span class="op">=</span> <span class="va">cfg</span>,</span>
 <span>  pretrained_model  <span class="op">=</span> <span class="va">pt_model</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># 5. Predict</span></span>
+<span><span class="co"># ── 5. Predict ────────────────────────────────────────────────────────────────</span></span>
 <span><span class="va">preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/survivehr_predict.html">survivehr_predict</a></span><span class="op">(</span><span class="va">ft_model</span>, <span class="va">events</span>, <span class="va">static_covariates</span><span class="op">)</span></span>
-<span><span class="co"># Returns: patient_id, CVD_cdf_last, CVD_auc, T2D_cdf_last, T2D_auc</span></span></code></pre></div>
+<span><span class="co"># Columns: patient_id, T2D_cdf_last, T2D_auc, CVD_cdf_last, CVD_auc</span></span></code></pre></div>
 <hr>
 </div>
 <div class="section level2">
@@ -237,15 +271,24 @@ new events ────────▶ survivehr_predict()  ──▶ per-patien
 <div class="section level2">
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
 </h2>
-<p>Full documentation, vignettes, and configuration reference at<br><strong><a href="https://pm-cardoso.github.io/RSurvivEHR/" class="uri">https://pm-cardoso.github.io/RSurvivEHR/</a></strong></p>
+<p>Full documentation, vignettes, and configuration reference at<br><strong><a href="https://pm-cardoso.github.io/RSurvivEHR/" target="_blank" rel="noopener noreferrer">https://pm-cardoso.github.io/RSurvivEHR/</a></strong></p>
 <ul>
 <li>
-<a href="https://pm-cardoso.github.io/RSurvivEHR/articles/getting-started.html">Getting started</a> — step-by-step walkthrough of the full pipeline</li>
+<a href="https://pm-cardoso.github.io/RSurvivEHR/articles/getting-started.html" target="_blank" rel="noopener noreferrer">Getting started</a> — step-by-step walkthrough of the full pipeline</li>
 <li>
-<a href="https://pm-cardoso.github.io/RSurvivEHR/articles/advanced-topics.html">Advanced topics</a> — token policy, age normalisation, static covariate encoding, FastEHR aliases, full worked example</li>
+<a href="https://pm-cardoso.github.io/RSurvivEHR/articles/advanced-topics.html" target="_blank" rel="noopener noreferrer">Advanced topics</a> — token policy, age normalisation, static covariate encoding, FastEHR aliases, full worked example</li>
 <li>
-<a href="https://pm-cardoso.github.io/RSurvivEHR/articles/model-architecture.html">Model architecture &amp; parameter reference</a> — every <code><a href="reference/survivehr_config.html">survivehr_config()</a></code> parameter with recommended values</li>
+<a href="https://pm-cardoso.github.io/RSurvivEHR/articles/model-architecture.html" target="_blank" rel="noopener noreferrer">Model architecture &amp; parameter reference</a> — every <code><a href="reference/survivehr_config.html">survivehr_config()</a></code> parameter with recommended values</li>
 </ul>
+<hr>
+</div>
+<div class="section level2">
+<h2 id="citation">Citation<a class="anchor" aria-label="anchor" href="#citation"></a>
+</h2>
+<p>If you use RSurvivEHR in your research, please cite the original SurvivEHR paper:</p>
+<blockquote>
+<p>Gadd, C. et al. (2025). <em>SurvivEHR: Transformer-based survival analysis on electronic health records</em>. medRxiv. <a href="https://doi.org/10.1101/2025.08.04.25332916" target="_blank" rel="noopener noreferrer" class="external-link">doi:10.1101/2025.08.04.25332916</a></p>
+</blockquote>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">

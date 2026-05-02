@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -302,7 +302,7 @@ patients:</p>
 <span><span class="co"># [OK] Events: 26 rows, 5 patients. Columns present, ages numeric and time-ordered.</span></span>
 <span><span class="co"># [OK] Static covariates: 5 patients, 4 covariate column(s): SEX, ETHNICITY, IMD, YEAR_OF_BIRTH.</span></span></code></pre></div>
 <div class="section level3">
-<h3 id="a-competing-risk-fine-tuning">4a Competing-risk fine-tuning<a class="anchor" aria-label="anchor" href="#a-competing-risk-fine-tuning"></a>
+<h3 id="a-competing-risk-fine-tuning">5a Competing-risk fine-tuning<a class="anchor" aria-label="anchor" href="#a-competing-risk-fine-tuning"></a>
 </h3>
 <p>Use <code>risk_model = "competing-risk"</code> when two or more
 outcomes compete — i.e. the occurrence of one prevents the other from
@@ -336,7 +336,7 @@ outcome.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Fine-tune (CR) loss history:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/unlist.html" class="external-link">unlist</a></span><span class="op">(</span><span class="va">ft_cr</span><span class="op">$</span><span class="va">history</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="b-single-risk-fine-tuning">4b Single-risk fine-tuning<a class="anchor" aria-label="anchor" href="#b-single-risk-fine-tuning"></a>
+<h3 id="b-single-risk-fine-tuning">5b Single-risk fine-tuning<a class="anchor" aria-label="anchor" href="#b-single-risk-fine-tuning"></a>
 </h3>
 <p>Use <code>risk_model = "single-risk"</code> when there is a single
 endpoint of interest and no competing events need to be modelled
@@ -465,7 +465,15 @@ silently producing wrong predictions if there is a mismatch.</p>
 <p>See the <a href="model-architecture.html">Model architecture</a>
 article for the full configuration reference and the official Gadd et
 al. 2025 hyperparameter table.</p>
+<hr>
 </div>
+</div>
+<div class="section level2">
+<h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
+</h2>
+<p>Gadd, C. et al. (2025). <em>SurvivEHR: Transformer-based survival
+analysis on electronic health records</em>. medRxiv.
+<a href="https://doi.org/10.1101/2025.08.04.25332916" target="_blank" rel="noopener noreferrer" class="external-link">doi:10.1101/2025.08.04.25332916</a></p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
