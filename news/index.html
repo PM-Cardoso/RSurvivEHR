@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.8</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.9</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -22,6 +22,7 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/getting-started.html">Getting started</a></li>
     <li><a class="dropdown-item" href="../articles/advanced-topics.html">Advanced topics</a></li>
     <li><a class="dropdown-item" href="../articles/model-architecture.html">Model architecture &amp; parameter reference</a></li>
+    <li><a class="dropdown-item" href="../articles/data-pipeline.html">Data pipeline internals</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><a class="external-link nav-link" href="https://github.com/PM-Cardoso/RSurvivEHR" aria-label="GitHub"><span class="fa fab fa-github"></span></a></li>
@@ -37,6 +38,11 @@
       <small>Source: <a href="https://github.com/PM-Cardoso/RSurvivEHR/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.7.9" id="rsurvivehr-079">RSurvivEHR 0.7.9<a class="anchor" aria-label="anchor" href="#rsurvivehr-079"></a></h2>
+<ul><li>
+<strong>New vignette — “Data pipeline internals”</strong> (<code>vignettes/data-pipeline.Rmd</code>): step-by-step walkthrough of how R data frames are transformed into PyTorch tensors. Covers R validation helpers, the reticulate handoff, event cleaning, vocabulary construction, tokenisation, age normalisation and padding, static covariate one-hot encoding, fine-tune target delta computation, and the final DataLoader batch structure. Each step links directly to the relevant function in the source code. The vignette is listed under <em>Articles → Data pipeline internals</em> in the pkgdown site.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.7.8" id="rsurvivehr-078">RSurvivEHR 0.7.8<a class="anchor" aria-label="anchor" href="#rsurvivehr-078"></a></h2>
 <ul><li>

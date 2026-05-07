@@ -1,5 +1,17 @@
 # Changelog
 
+## RSurvivEHR 0.7.9
+
+- **New vignette — “Data pipeline internals”**
+  (`vignettes/data-pipeline.Rmd`): step-by-step walkthrough of how R
+  data frames are transformed into PyTorch tensors. Covers R validation
+  helpers, the reticulate handoff, event cleaning, vocabulary
+  construction, tokenisation, age normalisation and padding, static
+  covariate one-hot encoding, fine-tune target delta computation, and
+  the final DataLoader batch structure. Each step links directly to the
+  relevant function in the source code. The vignette is listed under
+  *Articles → Data pipeline internals* in the pkgdown site.
+
 ## RSurvivEHR 0.7.8
 
 - **Consistent 10-patient example dataset throughout**: all R function
