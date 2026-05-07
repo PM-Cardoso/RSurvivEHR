@@ -1,5 +1,136 @@
 # Changelog
 
+## RSurvivEHR 0.7.8
+
+- **Consistent 10-patient example dataset throughout**: all R function
+  `@examples` in `R/train.R` now use the same 10-patient population
+  (`events_pop` / `static_pop`) as the *Getting Started* vignette. Each
+  patient has realistic prior-history events (e.g. `HYPERTENSION`,
+  `BP_CHECK`) before their outcome event, matching the structure of real
+  EHR data.
+- **Competing-risk example now genuinely uses two outcomes**: the
+  [`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md)
+  example and the *Getting Started* vignette Section 5a now model **CVD
+  vs T2D** (`outcomes = c("CVD", "T2D")`,
+  `risk_model = "competing-risk"`). The previous example used only a
+  single outcome, which is incorrect for competing-risk models.
+- **Leakage-free cohort construction in all examples**: targets are now
+  defined *before* filtering the context events. The merge-and-filter
+  pattern (`age < target_age`) is used consistently across the vignette
+  and function examples, ensuring no post-outcome events appear in the
+  input.
+- **`time_scale` removed from fine-tune configs in examples**: `cfg_cr`
+  and `cfg_sr` no longer set `time_scale` (it is inherited automatically
+  from the pretrained bundle). A comment explains the inheritance.
+- **Improved roxygen documentation for all exported functions**:
+  - [`survivehr_pretrain()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_pretrain.md),
+    [`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md),
+    [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md),
+    [`survivehr_save_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.md),
+    [`survivehr_load_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_load_model.md):
+    full `@description`, `@param`, and `@return` sections replacing
+    one-liner stubs.
+  - [`survivehr_validate_events()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_events.md),
+    [`survivehr_validate_static()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_static.md),
+    [`survivehr_validate_targets()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_targets.md):
+    detailed `@param` with `\describe{}` item lists explaining each
+    column and its accepted aliases.
+  - [`survivehr_config()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_config.md):
+    description updated to reference the *Model architecture* vignette
+    for Gadd et al. (2025) hyperparameters.
+- **Fixed single-risk prediction column naming and post-reload
+  breakage**: A reticulate round-trip conversion bug caused a
+  single-element Python list `["CVD"]` to become the bare string `"CVD"`
+  after the bundle travelled `Python → R list → Python` (i.e. on every
+  [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
+  call). This produced two symptoms:
+  - With the in-memory bundle (`ft_sr`):
+    [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
+    iterated the string character-by-character, labelling the CDF column
+    `"C_cdf_last"` instead of `"CVD_cdf_last"`.
+  - After
+    [`survivehr_save_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.md)
+    /
+    [`survivehr_load_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_load_model.md):
+    the string was persisted, then `load_model_bundle` iterated `"C"`,
+    `"V"`, `"D"` as outcome names — none present in the vocabulary — so
+    `outcome_tokens = []` and the reloaded head had 0 risks, returning a
+    data frame with only `patient_id`. Fixed by normalising `outcomes`
+    to a proper list at four sites in `survivehr_backend.py`:
+    `train_finetune_model` return, `predict_next_events`,
+    `save_model_bundle`, and `load_model_bundle`. Single-outcome
+    single-risk models (the most common case) are now correct in all
+    paths. adjacent string literals without a separating comma (not
+    valid R syntax). Replaced with
+    [`paste0()`](https://rdrr.io/r/base/paste.html) wrapping both
+    strings.
+- **`DESCRIPTION` description updated**: removed the outdated “no
+  FastEHR installation required” clause; added mentions of biomarker
+  value support, leakage-free helpers, and frequency-ordered
+  vocabularies.
+- **`advanced-topics.Rmd` full worked example aligned**: the standalone
+  6-patient dataset in the “Full worked example” section has been
+  replaced with the same 10-patient population used in *Getting
+  Started*, ensuring all documentation is consistent.
+- **README quick-start replaced with prose**: the R code block in the
+  README that used a different 5-patient dataset has been replaced with
+  a prose “Getting started” section pointing readers to the three
+  vignettes.
+
+## RSurvivEHR 0.7.7
+
+- **5-year prediction window**: all examples and documentation now use
+  `time_scale = 5.0`, giving a 5-year prediction window when ages are in
+  years. The
+  [`survivehr_config()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_config.md)
+  default remains `1.0` but the recommended value for clinical
+  applications is `5.0`.
+- **Clarified `time_scale` semantics**: `time_scale` controls **both**
+  the age normalisation divisor and the prediction window length. The
+  survival ODE evaluates over a normalised \[0, 1\] grid that maps back
+  to \[0, `time_scale`\] in raw age units. `time_scale` is stored inside
+  every model bundle;
+  [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
+  reads it automatically — it does not need to be supplied at inference
+  time. This is now documented in
+  [`survivehr_config()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_config.md)
+  `@param`,
+  [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
+  `@return`, the backend docstring, and the *Getting Started* vignette
+  (Section 3 and Section 7).
+- **Biomarker values in examples**: the 10-patient population in
+  `R/train.R` examples and `vignettes/getting-started.Rmd` now includes
+  realistic `value` entries: BP_CHECK readings (138–162 mmHg) and HBA1C
+  readings (68–74 mmol/mol) aligned to the correct event rows.
+- **Removed FastEHR branding from `README.md`**: the “FastEHR
+  compatibility” row has been removed from the key-features table and
+  the FastEHR alias description in the Input format section has been
+  reworded to plain English.
+
+## RSurvivEHR 0.7.6
+
+- **Frequency-ordered vocabulary**: event tokens are now assigned IDs in
+  descending frequency order (most common event = smallest ID after
+  reserved tokens `<PAD>`, `<UNK>`). Smaller IDs improve embedding
+  compression for common clinical codes. Existing saved models are
+  unaffected because the vocabulary is stored inside every `.pt` bundle.
+- **Improved examples throughout**: all R function examples and the
+  *Getting Started* vignette now use a 10-patient pre-training cohort
+  with three CVD cases providing the outcome token, and a 6-patient
+  fine-tuning subset (3 CVD cases + 3 right-censored controls). Context
+  events are explicitly filtered to remove the outcome (leakage-free).
+- **Documented prediction outputs and time window**:
+  [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
+  `@return` now fully documents `{outcome}_cdf_last` (cumulative
+  incidence at the end of the prediction window = `time_scale` time
+  units) and `{outcome}_auc` (area under the CDF = average risk over the
+  window). The vignette explains how to extend the prediction window by
+  changing `time_scale`.
+- **Removed FastEHR branding**: `fastEHR` / `FastEHR` mentions removed
+  from all documentation, error messages, and parameter descriptions.
+  Uppercase column aliases (`PATIENT_ID`, `EVENT`, `DAYS_SINCE_BIRTH`)
+  continue to work but are described without the FastEHR name.
+
 ## RSurvivEHR 0.7.5
 
 - **CPU/GPU device visibility**: the training start-up banner now prints

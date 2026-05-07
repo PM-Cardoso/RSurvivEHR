@@ -12,30 +12,30 @@ Install and configure the Python backend.
 Build and inspect model configuration.
 
 - [`survivehr_config()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_config.md)
-  : Build default SurvivEHR configuration
+  : Build an RSurvivEHR configuration list
 
 ## Training
 
 Pre-train, fine-tune, save, and load SurvivEHR models.
 
 - [`survivehr_pretrain()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_pretrain.md)
-  : Train a pretrain SurvivEHR model from R data frames
+  : Pre-train the RSurvivEHR backbone transformer
 - [`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md)
-  : Fine-tune SurvivEHR from R data frames
+  : Fine-tune the RSurvivEHR backbone on labelled outcomes
 - [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
-  : Predict next events with SurvivEHR
+  : Predict cumulative incidence with a fine-tuned RSurvivEHR model
 - [`survivehr_save_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.md)
-  : Save a SurvivEHR model bundle
+  : Save an RSurvivEHR model bundle to disk
 - [`survivehr_load_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_load_model.md)
-  : Load a SurvivEHR model bundle
+  : Load an RSurvivEHR model bundle from disk
 
 ## Validation helpers
 
 Validate input data frames before passing to training functions.
 
 - [`survivehr_validate_events()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_events.md)
-  : Validate events schema for SurvivEHR
+  : Validate the events data frame for RSurvivEHR
 - [`survivehr_validate_static()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_static.md)
-  : Validate static covariates schema for SurvivEHR
+  : Validate the static covariates data frame for RSurvivEHR
 - [`survivehr_validate_targets()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_targets.md)
-  : Validate fine-tune targets schema for SurvivEHR
+  : Validate the fine-tune targets data frame for RSurvivEHR

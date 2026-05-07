@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.8</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -67,7 +67,7 @@
           <code><a href="survivehr_config.html">survivehr_config()</a></code>
 
         </dt>
-        <dd>Build default SurvivEHR configuration</dd>
+        <dd>Build an RSurvivEHR configuration list</dd>
       </dl></div><div class="section level2">
       <h2 id="training">Training<a class="anchor" aria-label="anchor" href="#training"></a></h2>
 
@@ -83,35 +83,35 @@
           <code><a href="survivehr_pretrain.html">survivehr_pretrain()</a></code>
 
         </dt>
-        <dd>Train a pretrain SurvivEHR model from R data frames</dd>
+        <dd>Pre-train the RSurvivEHR backbone transformer</dd>
 
         <dt>
 
           <code><a href="survivehr_finetune.html">survivehr_finetune()</a></code>
 
         </dt>
-        <dd>Fine-tune SurvivEHR from R data frames</dd>
+        <dd>Fine-tune the RSurvivEHR backbone on labelled outcomes</dd>
 
         <dt>
 
           <code><a href="survivehr_predict.html">survivehr_predict()</a></code>
 
         </dt>
-        <dd>Predict next events with SurvivEHR</dd>
+        <dd>Predict cumulative incidence with a fine-tuned RSurvivEHR model</dd>
 
         <dt>
 
           <code><a href="survivehr_save_model.html">survivehr_save_model()</a></code>
 
         </dt>
-        <dd>Save a SurvivEHR model bundle</dd>
+        <dd>Save an RSurvivEHR model bundle to disk</dd>
 
         <dt>
 
           <code><a href="survivehr_load_model.html">survivehr_load_model()</a></code>
 
         </dt>
-        <dd>Load a SurvivEHR model bundle</dd>
+        <dd>Load an RSurvivEHR model bundle from disk</dd>
       </dl></div><div class="section level2">
       <h2 id="validation-helpers">Validation helpers<a class="anchor" aria-label="anchor" href="#validation-helpers"></a></h2>
 
@@ -127,21 +127,21 @@
           <code><a href="survivehr_validate_events.html">survivehr_validate_events()</a></code>
 
         </dt>
-        <dd>Validate events schema for SurvivEHR</dd>
+        <dd>Validate the events data frame for RSurvivEHR</dd>
 
         <dt>
 
           <code><a href="survivehr_validate_static.html">survivehr_validate_static()</a></code>
 
         </dt>
-        <dd>Validate static covariates schema for SurvivEHR</dd>
+        <dd>Validate the static covariates data frame for RSurvivEHR</dd>
 
         <dt>
 
           <code><a href="survivehr_validate_targets.html">survivehr_validate_targets()</a></code>
 
         </dt>
-        <dd>Validate fine-tune targets schema for SurvivEHR</dd>
+        <dd>Validate the fine-tune targets data frame for RSurvivEHR</dd>
       </dl></div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>

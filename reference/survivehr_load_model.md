@@ -1,6 +1,13 @@
-# Load a SurvivEHR model bundle
+# Load an RSurvivEHR model bundle from disk
 
-Load a SurvivEHR model bundle
+Restores a model bundle previously saved with
+[`survivehr_save_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.md).
+The returned object is identical in structure to the original bundle and
+can be passed directly to
+[`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
+or used as `pretrained_model` in a further
+[`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md)
+call.
 
 ## Usage
 
@@ -12,14 +19,14 @@ survivehr_load_model(path)
 
 - path:
 
-  file path created by
+  File path to a `.pt` bundle created by
   [`survivehr_save_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.md).
 
 ## Value
 
-Named list (model bundle) identical in structure to the original bundle
-returned by
-[`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md).
+A named list (model bundle) with elements `model`, `event_vocab`,
+`inv_vocab`, `config`, `time_scale`, `token_policy`, `history`, and
+`device`.
 
 ## Examples
 

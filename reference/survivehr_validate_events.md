@@ -1,6 +1,14 @@
-# Validate events schema for SurvivEHR
+# Validate the events data frame for RSurvivEHR
 
-Validate events schema for SurvivEHR
+Checks that the events data frame supplied to
+[`survivehr_pretrain()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_pretrain.md),
+[`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md),
+or
+[`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
+is correctly formatted before any Python call is made, giving an
+informative R error instead of a cryptic Python traceback. Specifically,
+it verifies that the required columns are present, that ages are numeric
+and non-negative, and that rows are time-ordered within each patient.
 
 ## Usage
 
@@ -12,13 +20,33 @@ survivehr_validate_events(events)
 
 - events:
 
-  data.frame with columns `patient_id`, `event`, `age` (or FastEHR
-  aliases `PATIENT_ID`, `EVENT`, `DAYS_SINCE_BIRTH`), optional
-  `value`/`VALUE`.
+  A `data.frame` with columns:
+
+  `patient_id`
+
+  :   Patient identifier (numeric or character).
+
+  `event`
+
+  :   Clinical event code (character).
+
+  `age`
+
+  :   Patient age at the event in consistent units (numeric,
+      non-negative, time-ordered within patient). The uppercase alias
+      `DAYS_SINCE_BIRTH` is also accepted.
+
+  `value`
+
+  :   (Optional) Continuous measurement recorded at the event (e.g.
+      blood pressure or HbA1c). `NA` for discrete events.
+
+  Uppercase column-name aliases `PATIENT_ID` and `EVENT` are also
+  accepted for compatibility.
 
 ## Value
 
-Invisibly returns TRUE.
+Invisibly returns `TRUE`. Prints a confirmation message on success.
 
 ## Examples
 

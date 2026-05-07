@@ -51,22 +51,52 @@ One row per clinical event, sorted by age within each patient.
 
 ``` r
 
-events <- data.frame(
-  patient_id = c(1, 1, 1, 1, 1,   2, 2, 2, 2, 2,   3, 3, 3, 3, 3),
-  event      = c("HYPERTENSION", "STATIN",    "T2D",     "BP_CHECK",  "METFORMIN",
-                 "T2D",          "METFORMIN", "HBA1C",   "HYPERTENSION","STATIN",
-                 "STATIN",       "T2D",       "BP_CHECK","HBA1C",     "METFORMIN"),
-  age        = c(50.0, 50.5, 52.0, 52.1, 52.3,
-                 45.0, 45.3, 46.0, 47.5, 48.0,
-                 58.0, 60.1, 61.5, 62.0, 62.3),
-  value      = c(NA,   NA,   NA,   152,  NA,     # patient 1: BP_CHECK=152 mmHg
-                 NA,   NA,   61,   NA,   NA,     # patient 2: HBA1C=61 mmol/mol
-                 NA,   NA,   145,  58,   NA)     # patient 3: BP_CHECK=145 mmHg, HBA1C=58 mmol/mol
+# 10-patient pre-training cohort.
+# Patients 1–3 have CVD events so the vocabulary includes CVD —
+# a prerequisite for CVD fine-tuning in Section 5.
+events_pop <- data.frame(
+  patient_id = c(rep(1,4), rep(2,6), rep(3,6), rep(4,4), rep(5,6),
+                 rep(6,4), rep(7,4), rep(8,4), rep(9,6), rep(10,4)),
+  event = c(
+    "HYPERTENSION","STATIN","BP_CHECK","CVD",                          # p1 — CVD at 58
+    "HYPERTENSION","BP_CHECK","T2D","METFORMIN","HYPERTENSION","CVD",  # p2 — T2D at 48, CVD at 52
+    "HYPERTENSION","BP_CHECK","STATIN","T2D","BP_CHECK","CVD",         # p3 — T2D at 63.5, CVD at 65.5
+    "HYPERTENSION","STATIN","T2D","METFORMIN",                         # p4 — T2D at 47
+    "HYPERTENSION","BP_CHECK","T2D","HBA1C","METFORMIN","STATIN",      # p5 — T2D at 51
+    "HYPERTENSION","AMLODIPINE","BP_CHECK","STATIN",                   # p6 — censored
+    "STATIN","T2D","HBA1C","METFORMIN",                                # p7 — T2D at 42
+    "HYPERTENSION","BP_CHECK","STATIN","T2D",                          # p8 — T2D at 62
+    "HYPERTENSION","BP_CHECK","T2D","METFORMIN","HBA1C","STATIN",      # p9 — T2D at 50
+    "STATIN","BP_CHECK","HYPERTENSION","T2D"                           # p10 — T2D at 49
+  ),
+  age = c(
+    55.0, 55.5, 56.2, 58.0,
+    44.0, 45.5, 48.0, 48.3, 50.5, 52.0,
+    58.0, 59.5, 62.0, 63.5, 64.0, 65.5,
+    45.0, 45.5, 47.0, 48.3,
+    48.0, 49.0, 51.0, 52.0, 53.0, 54.5,
+    60.0, 61.0, 62.3, 63.0,
+    40.0, 42.0, 43.5, 44.8,
+    58.0, 59.2, 60.0, 62.0,
+    46.0, 47.5, 50.0, 52.0, 52.5, 54.0,
+    44.0, 46.5, 47.0, 48.5
+  ),
+  value = c(
+    NA,  NA,  148, NA,          # p1 : BP_CHECK = 148 mmHg
+    NA,  145, NA,  NA,  NA, NA, # p2 : BP_CHECK = 145 mmHg
+    NA,  158, NA,  NA,  162,NA, # p3 : BP_CHECK = 158 mmHg, 162 mmHg
+    NA,  NA,  NA,  NA,          # p4
+    NA,  152, NA,  68,  NA, NA, # p5 : BP_CHECK = 152 mmHg, HBA1C = 68 mmol/mol
+    NA,  NA,  155, NA,          # p6 : BP_CHECK = 155 mmHg
+    NA,  NA,  74,  NA,          # p7 : HBA1C = 74 mmol/mol
+    NA,  145, NA,  NA,          # p8 : BP_CHECK = 145 mmHg
+    NA,  138, NA,  NA,  71, NA, # p9 : BP_CHECK = 138 mmHg, HBA1C = 71 mmol/mol
+    NA,  138, NA,  NA           # p10: BP_CHECK = 138 mmHg
+  )
 )
 ```
 
-Required columns: `patient_id`, `event`, `age`. FastEHR aliases are also
-accepted: `PATIENT_ID`, `EVENT`, `DAYS_SINCE_BIRTH`.
+Required columns: `patient_id`, `event`, `age`.
 
 > Continuous readings (blood pressure, HbA1c, BMI, etc.) go in the
 > `value` column alongside the event that recorded them. Rows without a
@@ -84,17 +114,17 @@ encoded automatically; numeric columns pass through unchanged.
 > column can be named freely — the backend encodes whatever it finds. By
 > contrast, the **events** and **targets** tables require fixed column
 > names (`patient_id`, `event`, `age`, `value`; and `patient_id`,
-> `target_event`, `target_age`, `target_value` respectively) or their
-> FastEHR UPPER_CASE aliases.
+> `target_event`, `target_age`, `target_value` respectively).
 
 ``` r
 
-static_covariates <- data.frame(
-  patient_id     = c(1, 2, 3),
-  SEX            = c("M", "F", "M"),           # categorical → one-hot
-  ETHNICITY      = c("White", "Asian", "White"),# categorical → one-hot
-  IMD            = c(3L, 1L, 5L),              # numeric     → pass-through
-  YEAR_OF_BIRTH  = c(1965L, 1972L, 1955L)      # numeric     → pass-through
+static_pop <- data.frame(
+  patient_id    = 1:10,
+  SEX           = c("M","F","M","F","M","F","M","F","M","F"),
+  ETHNICITY     = c("White","Asian","White","Black","White",
+                    "Asian","White","White","Black","White"),
+  IMD           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
+  YEAR_OF_BIRTH = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
 )
 ```
 
@@ -111,10 +141,10 @@ clear R error rather than a cryptic Python traceback.
 
 ``` r
 
-survivehr_validate_events(events)
-survivehr_validate_static(static_covariates)
-# [OK] Events: 15 rows, 3 patients. Columns present, ages numeric and time-ordered.
-# [OK] Static covariates: 3 patients, 4 covariate column(s): SEX, ETHNICITY, IMD, YEAR_OF_BIRTH.
+survivehr_validate_events(events_pop)
+survivehr_validate_static(static_pop)
+# [OK] Events: 48 rows, 10 patients. Columns present, ages numeric and time-ordered.
+# [OK] Static covariates: 10 patients, 4 covariate column(s): SEX, ETHNICITY, IMD, YEAR_OF_BIRTH.
 ```
 
 ------------------------------------------------------------------------
@@ -136,7 +166,7 @@ cfg <- survivehr_config(
   epochs        = 10,
   batch_size    = 4,
   surv_layer    = "competing-risk",  # or "single-risk" — see Section 5
-  time_scale    = 1.0   # ages are in years; use 1825.0 for DAYS_SINCE_BIRTH
+  time_scale    = 5.0   # prediction window = 5 years (ages are in years)
 )
 ```
 
@@ -145,8 +175,8 @@ Key parameters:
 | Parameter | Description |
 |----|----|
 | `block_size` | Context window length — sequences are padded/truncated to this. |
-| `surv_layer` | `"competing-risk"` models multiple simultaneous outcomes; `"single-risk"` models one. |
-| `time_scale` | Age divisor applied before the model. `1.0` for years, `1825.0` for days. Must match across pretrain/finetune/predict. |
+| `surv_layer` | Controls the **backbone** time-to-next-event head during pre-training (and must remain consistent at fine-tune). Leave at `"competing-risk"` (default) for most use cases. The outcome-level head is controlled by `risk_model` in [`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md) — see Section 5. |
+| `time_scale` | **Sets both the age normalisation divisor and the prediction window length.** Ages are divided by this value before entering the model; the survival ODE evaluates over a normalised \[0, 1\] grid mapping back to \[0, `time_scale`\] in your age units. Use `5.0` for a 5-year window with ages in years, `1.0` for 1-year. Stored in every model bundle — [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md) reads it automatically. |
 | `include_unk` | If `TRUE` (default), a `<UNK>` token is reserved for unseen events at prediction time. |
 
 ------------------------------------------------------------------------
@@ -159,13 +189,14 @@ on the full event history.
 ``` r
 
 pt_model <- survivehr_pretrain(
-  events            = events,
-  static_covariates = static_covariates,
+  events            = events_pop,
+  static_covariates = static_pop,
   config            = cfg
 )
 
-# Vocabulary built alphabetically after reserved tokens:
-# <PAD>=0  <UNK>=1  BP_CHECK=2  HBA1C=3  HYPERTENSION=4  METFORMIN=5  STATIN=6  T2D=7
+# Vocabulary ordered by frequency — most-common events get the smallest token IDs.
+# With this dataset: HYPERTENSION (10), BP_CHECK (9), STATIN (9), T2D (8),
+# METFORMIN (5), CVD (3), HBA1C (3), AMLODIPINE (1).
 pt_model$event_vocab
 ```
 
@@ -186,81 +217,83 @@ pt_model <- survivehr_load_model("pretrain_backbone.pt")
 
 ## 5 Fine-tuning
 
-Fine-tuning requires a `targets` data frame that labels the outcome for
-each patient. Events in the fine-tuning set must **not** contain the
-outcome event for labelled patients (leakage-free context).
+Fine-tuning requires a `targets` data frame labelling, for each patient,
+which outcome was observed (or the last observed non-outcome event if
+censored). Two leakage conditions must both be satisfied when building
+the context:
 
-Build a combined events/static table that includes the labelled
-patients:
+1.  **Remove outcome event codes** from context — the outcome is
+    supplied only in `targets`.
+2.  **Remove events after the outcome age** — events that occurred after
+    the labelled outcome would not be available at prediction time.
 
-``` r
+Because condition 2 requires knowing each patient’s `target_age`, define
+`targets` **before** filtering the context.
 
-# Add two labelled patients: patient 4 developed T2D, patient 5 developed CVD
-events_all <- rbind(
-  events,
-  data.frame(
-    patient_id = c(4, 4, 4, 4, 4,   5, 5, 5, 5, 5, 5),
-    event      = c("HYPERTENSION", "AMLODIPINE", "BP_CHECK", "STATIN", "T2D",
-                   "T2D", "STATIN", "HBA1C", "HYPERTENSION", "METFORMIN", "CVD"),
-    age        = c(55.0, 55.4, 56.0, 57.2, 58.0,
-                   48.0, 48.6, 49.0, 49.1, 50.5, 51.2),
-    value      = c(NA, NA, 168, NA, NA,        # p4: BP_CHECK=168 mmHg
-                   NA, NA, 67,  NA, NA, NA)    # p5: HBA1C=67 mmol/mol
-  )
-)
-
-static_all <- rbind(
-  static_covariates,
-  data.frame(
-    patient_id    = c(4, 5),
-    SEX           = c("F", "M"),
-    ETHNICITY     = c("White", "White"),
-    IMD           = c(2L, 4L),
-    YEAR_OF_BIRTH = c(1960L, 1968L)
-  )
-)
-```
-
-Validate the extended dataset before fine-tuning:
+We use **patients 1–6** as the fine-tuning cohort.
 
 ``` r
 
-survivehr_validate_events(events_all)
-survivehr_validate_static(static_all)
-# [OK] Events: 26 rows, 5 patients. Columns present, ages numeric and time-ordered.
-# [OK] Static covariates: 5 patients, 4 covariate column(s): SEX, ETHNICITY, IMD, YEAR_OF_BIRTH.
+ft_static <- static_pop[static_pop$patient_id %in% 1:6, ]
+survivehr_validate_static(ft_static)
+# [OK] Static covariates: 6 patients, 4 covariate column(s): SEX, ETHNICITY, IMD, YEAR_OF_BIRTH.
 ```
 
 ### 5a Competing-risk fine-tuning
 
-Use `risk_model = "competing-risk"` when two or more outcomes compete —
-i.e. the occurrence of one prevents the other from being observed. A
-separate ODE survival head is fitted for each outcome.
+Use `risk_model = "competing-risk"` when two or more outcomes
+**compete** — i.e. the occurrence of one prevents the other from being
+observed. Here we model **CVD vs T2D**: patients 1–6 each experience
+exactly one of the two outcomes first, or are censored if neither
+occurred.
+
+| Patient | Observed event | Why |
+|----|----|----|
+| p1 | CVD at 58.0 | CVD case — no prior T2D |
+| p2 | T2D at 48.0 | T2D occurred first (CVD followed at 52.0 but is the competing event) |
+| p3 | T2D at 63.5 | T2D occurred first (CVD followed at 65.5) |
+| p4 | T2D at 47.0 | T2D case |
+| p5 | T2D at 51.0 | T2D case |
+| p6 | STATIN at 63.0 | Censored — neither CVD nor T2D observed |
+
+Both outcome codes are removed from the context so neither leaks into
+the input features.
 
 ``` r
 
+# 1. Define targets first — the outcome age is needed to cut off the context
 targets_cr <- data.frame(
-  patient_id   = c(4L, 5L),
-  target_event = c("T2D", "CVD"),
-  target_age   = c(58.0, 51.2)
+  patient_id   = c(1L,    2L,    3L,    4L,    5L,    6L),
+  target_event = c("CVD", "T2D", "T2D", "T2D", "T2D", "STATIN"),
+  target_age   = c(58.0,  48.0,  63.5,  47.0,  51.0,  63.0)
 )
 survivehr_validate_targets(targets_cr)
 
+# 2. Build context: patients 1–6, outcome codes removed, events after outcome age excluded
+ft_events_cr <- events_pop[events_pop$patient_id %in% 1:6 &
+                              !events_pop$event %in% c("CVD", "T2D"), ]
+ft_events_cr <- merge(ft_events_cr, targets_cr[, c("patient_id", "target_age")],
+                      by = "patient_id")
+ft_events_cr <- ft_events_cr[ft_events_cr$age < ft_events_cr$target_age,
+                              c("patient_id", "event", "age", "value")]
+survivehr_validate_events(ft_events_cr)
+# [OK] Events: 15 rows, 6 patients. ...
+
+# time_scale is not set here — it is inherited automatically from the pretrained bundle
 cfg_cr <- survivehr_config(
   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
   dropout = 0, learning_rate = 3e-4, epochs = 10, batch_size = 4,
-  surv_layer = "competing-risk", time_scale = 1.0
+  surv_layer = "competing-risk"
 )
 
-# Remove outcome event from context to prevent data leakage
 ft_cr <- survivehr_finetune(
-  events            = events_all[!events_all$event %in% c("CVD"), ],
+  events            = ft_events_cr,
   targets           = targets_cr,
-  outcomes          = c("T2D", "CVD"),
+  outcomes          = c("CVD", "T2D"),   # two competing outcomes
   risk_model        = "competing-risk",
-  static_covariates = static_all,
+  static_covariates = ft_static,
   config            = cfg_cr,
-  pretrained_model  = pt_model   # vocabulary + weights inherited
+  pretrained_model  = pt_model           # vocabulary + weights inherited
 )
 
 cat("Fine-tune (CR) loss history:", unlist(ft_cr$history), "\n")
@@ -269,29 +302,44 @@ cat("Fine-tune (CR) loss history:", unlist(ft_cr$history), "\n")
 ### 5b Single-risk fine-tuning
 
 Use `risk_model = "single-risk"` when there is a single endpoint of
-interest and no competing events need to be modelled explicitly.
+interest and no competing events need to be modelled explicitly. Here we
+model **CVD only**: patients 1–3 are CVD cases; patients 4–6 are
+right-censored controls.
 
 ``` r
 
+# 1. Define targets first
 targets_sr <- data.frame(
-  patient_id   = c(4L, 5L),
-  target_event = c("T2D", "T2D"),
-  target_age   = c(58.0, 50.5)
+  patient_id   = c(1L,    2L,    3L,     4L,          5L,       6L),
+  target_event = c("CVD", "CVD", "CVD",  "METFORMIN", "STATIN", "STATIN"),
+  target_age   = c(58.0,  52.0,  65.5,   48.3,         54.5,     63.0)
 )
 survivehr_validate_targets(targets_sr)
 
+# 2. Build context: CVD removed, events after outcome age excluded
+# (T2D remains in context because it is not an outcome in this single-risk model)
+ft_events_sr <- events_pop[events_pop$patient_id %in% 1:6 &
+                              events_pop$event != "CVD", ]
+ft_events_sr <- merge(ft_events_sr, targets_sr[, c("patient_id", "target_age")],
+                      by = "patient_id")
+ft_events_sr <- ft_events_sr[ft_events_sr$age < ft_events_sr$target_age,
+                              c("patient_id", "event", "age", "value")]
+survivehr_validate_events(ft_events_sr)
+# [OK] Events: 24 rows, 6 patients. ...
+
+# time_scale is not set here — it is inherited automatically from the pretrained bundle
 cfg_sr <- survivehr_config(
   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
   dropout = 0, learning_rate = 3e-4, epochs = 10, batch_size = 4,
-  surv_layer = "single-risk", time_scale = 1.0
+  surv_layer = "competing-risk"
 )
 
 ft_sr <- survivehr_finetune(
-  events            = events_all[events_all$event != "CVD", ],
+  events            = ft_events_sr,
   targets           = targets_sr,
-  outcomes          = c("T2D"),
+  outcomes          = "CVD",             # single outcome
   risk_model        = "single-risk",
-  static_covariates = static_all,
+  static_covariates = ft_static,
   config            = cfg_sr,
   pretrained_model  = pt_model
 )
@@ -301,8 +349,8 @@ cat("Fine-tune (SR) loss history:", unlist(ft_sr$history), "\n")
 
 | Setting | When to use |
 |----|----|
-| `"competing-risk"` | Multiple simultaneous endpoints (e.g. CVD and T2D compete). |
-| `"single-risk"` | One endpoint, no competing events to account for. |
+| `"competing-risk"` | Multiple simultaneous endpoints (e.g. CVD and T2D compete to be the first event). |
+| `"single-risk"` | One endpoint; controls are right-censored by any other event. |
 
 ------------------------------------------------------------------------
 
@@ -313,7 +361,7 @@ cat("Fine-tune (SR) loss history:", unlist(ft_sr$history), "\n")
 survivehr_save_model(ft_cr, "model_cr.pt")
 survivehr_save_model(ft_sr, "model_sr.pt")
 
-# Reload — weights, vocabulary, static column schema, and time_scale are preserved
+# Reload — weights, vocabulary, static column schema, time_scale and device are preserved
 ft_cr2 <- survivehr_load_model("model_cr.pt")
 ft_sr2 <- survivehr_load_model("model_sr.pt")
 ```
@@ -322,25 +370,68 @@ ft_sr2 <- survivehr_load_model("model_sr.pt")
 
 ## 7 Prediction
 
+Prediction uses the **full 10-patient population** (including patients
+7–10 who were held out from fine-tuning) to demonstrate population-level
+risk scoring. Two preparation steps are required — the same logic as
+fine-tuning:
+
+1.  **Remove outcome event codes** from the context.
+2.  **Remove events after each patient’s prediction age** — for patients
+    with a known outcome (p1–p6) this is their `target_age`; for
+    held-out patients (p7–p10) this is their last recorded event age.
+
 ``` r
 
-# Competing-risk predictions (T2D vs CVD)
-preds_cr <- survivehr_predict(ft_cr2, events_all, static_all)
-head(preds_cr)
-# Columns: patient_id, T2D_cdf_last, T2D_auc, CVD_cdf_last, CVD_auc
+# Prediction ages: target_age for p1-6 (from targets_cr / targets_sr),
+# last recorded event age for p7-10.
+pred_ages_cr <- data.frame(
+  patient_id = c(1L,   2L,   3L,    4L,   5L,   6L,   7L,   8L,   9L,  10L),
+  pred_age   = c(58.0, 48.0, 63.5, 47.0, 51.0, 63.0, 44.8, 62.0, 54.0, 48.5)
+)
+pred_ages_sr <- data.frame(
+  patient_id = c(1L,   2L,   3L,    4L,   5L,   6L,   7L,   8L,   9L,  10L),
+  pred_age   = c(58.0, 52.0, 65.5, 48.3, 54.5, 63.0, 44.8, 62.0, 54.0, 48.5)
+)
 
-# Single-risk predictions (T2D only)
-preds_sr <- survivehr_predict(ft_sr2, events_all, static_all)
+# Competing-risk context: remove CVD + T2D, keep events before pred_age
+pred_events_cr <- events_pop[!events_pop$event %in% c("CVD", "T2D"), ]
+pred_events_cr <- merge(pred_events_cr, pred_ages_cr, by = "patient_id")
+pred_events_cr <- pred_events_cr[pred_events_cr$age < pred_events_cr$pred_age,
+                                  c("patient_id", "event", "age", "value")]
+survivehr_validate_events(pred_events_cr)
+# [OK] Events: 27 rows, 10 patients. ...
+
+# Single-risk context: remove CVD only, keep events before pred_age
+pred_events_sr <- events_pop[events_pop$event != "CVD", ]
+pred_events_sr <- merge(pred_events_sr, pred_ages_sr, by = "patient_id")
+pred_events_sr <- pred_events_sr[pred_events_sr$age < pred_events_sr$pred_age,
+                                  c("patient_id", "event", "age", "value")]
+survivehr_validate_events(pred_events_sr)
+# [OK] Events: 38 rows, 10 patients. ...
+
+# Competing-risk predictions — CVD and T2D risk head
+preds_cr <- survivehr_predict(ft_cr2, pred_events_cr, static_pop)
+head(preds_cr)
+# Columns: patient_id, CVD_cdf_last, CVD_auc, T2D_cdf_last, T2D_auc
+
+# Single-risk predictions — CVD risk head
+preds_sr <- survivehr_predict(ft_sr2, pred_events_sr, static_pop)
 head(preds_sr)
-# Columns: patient_id, T2D_cdf_last, T2D_auc
+# Columns: patient_id, CVD_cdf_last, CVD_auc
 ```
 
-Output columns:
+### Understanding the output columns
 
 | Column | Description |
 |----|----|
-| `{outcome}_cdf_last` | Cumulative incidence at the last time step of the prediction window. |
-| `{outcome}_auc` | Area under the CDF — a scalar summary of overall risk. |
+| `{outcome}_cdf_last` | Cumulative incidence at the **end** of the prediction window. The window spans `[0, time_scale]` in the same units as `age`. With `time_scale = 5.0` (as used in this vignette), this is the estimated probability that the outcome occurs within the **next 5 years** from the patient’s last recorded event. |
+| `{outcome}_auc` | **Area under the CDF** integrated across the full prediction window. This is the average cumulative risk from time 0 to `time_scale`. Values closer to 1 indicate higher overall risk; values closer to 0 indicate lower risk. Use `auc` when you want a single scalar risk score for ranking patients. |
+
+> **Prediction window**: internally, the survival ODE evaluates the CDF
+> on a fixed grid of 1 000 equally-spaced time steps from 0 to 1 in
+> *normalised* time. Normalised time 1.0 corresponds to `time_scale` in
+> raw units. The grid is set at model architecture level (not a user
+> parameter).
 
 ### New patients at inference
 
@@ -351,14 +442,14 @@ producing wrong predictions if there is a mismatch.
 
 ``` r
 
-new_patient <- data.frame(
+new_events <- data.frame(
   patient_id = c(99, 99, 99, 99),
-  event      = c("T2D", "BP_CHECK", "METFORMIN", "ASPIRIN"),  # ASPIRIN → <UNK>
+  event      = c("HYPERTENSION", "BP_CHECK", "METFORMIN", "ASPIRIN"),  # ASPIRIN → <UNK>
   age        = c(55.0,  55.3,       55.4,         56.1),
-  value      = c(NA,    158,        NA,           NA)           # BP_CHECK=158 mmHg
+  value      = c(NA,    158,        NA,           NA)
 )
 
-# Must include the same columns as static_all: SEX, ETHNICITY, IMD, YEAR_OF_BIRTH
+# Must include the same columns as static_pop: SEX, ETHNICITY, IMD, YEAR_OF_BIRTH
 new_static <- data.frame(
   patient_id    = 99,
   SEX           = "M",
@@ -367,7 +458,7 @@ new_static <- data.frame(
   YEAR_OF_BIRTH = 1963L
 )
 
-pred_new <- survivehr_predict(ft_cr2, new_patient, new_static)
+pred_new <- survivehr_predict(ft_cr2, new_events, new_static)
 print(pred_new)
 ```
 

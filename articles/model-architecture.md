@@ -230,12 +230,29 @@ Early stopping is **disabled** during pre-training and **enabled**
 
 ------------------------------------------------------------------------
 
-### `surv_layer` – survival head type
+### `surv_layer` – backbone time-to-next-event head
+
+SurvivEHR pre-training goes beyond standard causal language modelling
+(predicting *which* event comes next). The backbone also trains a
+survival head to predict *when* the next event occurs, using the age at
+each sequence position as the time target. `surv_layer` controls how
+that timing problem is framed:
 
 | Value | Description |
 |----|----|
-| `"competing-risk"` (default) | Neural-ODE head with one ODE per outcome event. Models cause-specific cumulative incidence functions (CIF). |
-| `"single-risk"` | Neural-ODE head with a single ODE. Used when only one endpoint is of interest. |
+| `"competing-risk"` (default) | Treats each position as a genuine competing-risk problem: only one event can be next, so all other vocabulary events are implicitly competing. One neural ODE per vocabulary token. |
+| `"single-risk"` | Fits one independent ODE per vocabulary token in a 1-vs-all fashion, treating all other events as censored rather than competing. |
+
+> **Used in both pre-training and fine-tuning** — the backbone
+> constructor reads `cfg.head.SurvLayer` at both stages, so the
+> architecture must remain consistent. The **outcome-level** head that
+> produces patient predictions is controlled separately by the
+> `risk_model` argument to
+> [`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md).
+> Because they are entirely separate `nn.Module` objects, `surv_layer`
+> and `risk_model` **can differ** — e.g. pretrain with
+> `surv_layer = "competing-risk"` and fine-tune with
+> `risk_model = "single-risk"` with no conflict.
 
 The upstream config uses the abbreviated codes `"cr"` and `"sr"` – both
 are also accepted by RSurvivEHR.
@@ -257,6 +274,11 @@ also learned measurement magnitudes (e.g. BMI, blood pressure).
 
 ### `include_unk`
 
+> **Pre-training only.** This setting is fixed when the vocabulary is
+> built during
+> [`survivehr_pretrain()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_pretrain.md)
+> and stored in the bundle. The value in a fine-tune config is ignored.
+
 | RSurvivEHR default | Notes                                  |
 |--------------------|----------------------------------------|
 | `TRUE`             | Always recommended for production use. |
@@ -267,6 +289,9 @@ prediction time is silently mapped to `<UNK>`.
 ------------------------------------------------------------------------
 
 ### `include_cls_sep`
+
+> **Pre-training only.** Fixed at vocabulary build time and stored in
+> the bundle. The value in a fine-tune config is ignored.
 
 | RSurvivEHR default | Notes |
 |----|----|
@@ -282,10 +307,19 @@ GPT-style pre-training.
 All raw ages are divided by `time_scale` before entering the model.
 **Must be consistent** across pre-training, fine-tuning, and prediction.
 
-| Age unit                                    | Recommended `time_scale` |
-|---------------------------------------------|--------------------------|
-| Years (e.g. `50.0`)                         | `1.0`                    |
-| Days since birth (e.g. `18262` ~= 50 years) | `365.25`                 |
+- **Pre-training**: used only for age normalisation — there is no
+  prediction window at this stage.
+- **Fine-tuning**: also defines the prediction window. The ODE
+  integrates over $`[0,1]`$ which corresponds to
+  $`[0, \texttt{time\_scale}]`$ raw time units, so `time_scale = 5.0`
+  means the survival curves cover a 5-year window. The value is stored
+  in the pretrained bundle and reused automatically — you do **not**
+  need to repeat it in a fine-tune config.
+
+| Age unit | Recommended `time_scale` |
+|----|----|
+| Years (e.g. `50.0`) | `1.0` or the desired horizon in years (e.g. `5.0`) |
+| Days since birth (e.g. `18262` ≈ 50 years) | `365.25` |
 
 ------------------------------------------------------------------------
 
@@ -328,7 +362,7 @@ Built automatically during
     - `<CLS>` -\> index 2 (when `include_cls_sep = TRUE`)
     - `<SEP>` -\> index 3 (when `include_cls_sep = TRUE`)
 3.  Clinical tokens assigned indices \>= 2 (or \>= 4 with CLS/SEP),
-    sorted **alphabetically**.
+    ordered by **frequency — most common event first** (lowest index).
 
 At fine-tuning, outcome codes absent from the vocab are **automatically
 appended** and the embedding layer is extended using a weight-safe copy

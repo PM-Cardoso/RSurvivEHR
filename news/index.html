@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.8</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,6 +37,59 @@
       <small>Source: <a href="https://github.com/PM-Cardoso/RSurvivEHR/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.7.8" id="rsurvivehr-078">RSurvivEHR 0.7.8<a class="anchor" aria-label="anchor" href="#rsurvivehr-078"></a></h2>
+<ul><li>
+<strong>Consistent 10-patient example dataset throughout</strong>: all R function <code>@examples</code> in <code>R/train.R</code> now use the same 10-patient population (<code>events_pop</code> / <code>static_pop</code>) as the <em>Getting Started</em> vignette. Each patient has realistic prior-history events (e.g. <code>HYPERTENSION</code>, <code>BP_CHECK</code>) before their outcome event, matching the structure of real EHR data.</li>
+<li>
+<strong>Competing-risk example now genuinely uses two outcomes</strong>: the <code><a href="../reference/survivehr_finetune.html">survivehr_finetune()</a></code> example and the <em>Getting Started</em> vignette Section 5a now model <strong>CVD vs T2D</strong> (<code>outcomes = c("CVD", "T2D")</code>, <code>risk_model = "competing-risk"</code>). The previous example used only a single outcome, which is incorrect for competing-risk models.</li>
+<li>
+<strong>Leakage-free cohort construction in all examples</strong>: targets are now defined <em>before</em> filtering the context events. The merge-and-filter pattern (<code>age &lt; target_age</code>) is used consistently across the vignette and function examples, ensuring no post-outcome events appear in the input.</li>
+<li>
+<strong><code>time_scale</code> removed from fine-tune configs in examples</strong>: <code>cfg_cr</code> and <code>cfg_sr</code> no longer set <code>time_scale</code> (it is inherited automatically from the pretrained bundle). A comment explains the inheritance.</li>
+<li>
+<strong>Improved roxygen documentation for all exported functions</strong>:
+<ul><li>
+<code><a href="../reference/survivehr_pretrain.html">survivehr_pretrain()</a></code>, <code><a href="../reference/survivehr_finetune.html">survivehr_finetune()</a></code>, <code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code>, <code><a href="../reference/survivehr_save_model.html">survivehr_save_model()</a></code>, <code><a href="../reference/survivehr_load_model.html">survivehr_load_model()</a></code>: full <code>@description</code>, <code>@param</code>, and <code>@return</code> sections replacing one-liner stubs.</li>
+<li>
+<code><a href="../reference/survivehr_validate_events.html">survivehr_validate_events()</a></code>, <code><a href="../reference/survivehr_validate_static.html">survivehr_validate_static()</a></code>, <code><a href="../reference/survivehr_validate_targets.html">survivehr_validate_targets()</a></code>: detailed <code>@param</code> with <code>\describe{}</code> item lists explaining each column and its accepted aliases.</li>
+<li>
+<code><a href="../reference/survivehr_config.html">survivehr_config()</a></code>: description updated to reference the <em>Model architecture</em> vignette for Gadd et al. (2025) hyperparameters.</li>
+</ul></li>
+<li>
+<strong>Fixed single-risk prediction column naming and post-reload breakage</strong>: A reticulate round-trip conversion bug caused a single-element Python list <code>["CVD"]</code> to become the bare string <code>"CVD"</code> after the bundle travelled <code>Python → R list → Python</code> (i.e. on every <code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code> call). This produced two symptoms:
+<ul><li>With the in-memory bundle (<code>ft_sr</code>): <code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code> iterated the string character-by-character, labelling the CDF column <code>"C_cdf_last"</code> instead of <code>"CVD_cdf_last"</code>.</li>
+<li>After <code><a href="../reference/survivehr_save_model.html">survivehr_save_model()</a></code> / <code><a href="../reference/survivehr_load_model.html">survivehr_load_model()</a></code>: the string was persisted, then <code>load_model_bundle</code> iterated <code>"C"</code>, <code>"V"</code>, <code>"D"</code> as outcome names — none present in the vocabulary — so <code>outcome_tokens = []</code> and the reloaded head had 0 risks, returning a data frame with only <code>patient_id</code>. Fixed by normalising <code>outcomes</code> to a proper list at four sites in <code>survivehr_backend.py</code>: <code>train_finetune_model</code> return, <code>predict_next_events</code>, <code>save_model_bundle</code>, and <code>load_model_bundle</code>. Single-outcome single-risk models (the most common case) are now correct in all paths. adjacent string literals without a separating comma (not valid R syntax). Replaced with <code><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0()</a></code> wrapping both strings.</li>
+</ul></li>
+<li>
+<strong><code>DESCRIPTION</code> description updated</strong>: removed the outdated “no FastEHR installation required” clause; added mentions of biomarker value support, leakage-free helpers, and frequency-ordered vocabularies.</li>
+<li>
+<strong><code>advanced-topics.Rmd</code> full worked example aligned</strong>: the standalone 6-patient dataset in the “Full worked example” section has been replaced with the same 10-patient population used in <em>Getting Started</em>, ensuring all documentation is consistent.</li>
+<li>
+<strong>README quick-start replaced with prose</strong>: the R code block in the README that used a different 5-patient dataset has been replaced with a prose “Getting started” section pointing readers to the three vignettes.</li>
+</ul></div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.7.7" id="rsurvivehr-077">RSurvivEHR 0.7.7<a class="anchor" aria-label="anchor" href="#rsurvivehr-077"></a></h2>
+<ul><li>
+<strong>5-year prediction window</strong>: all examples and documentation now use <code>time_scale = 5.0</code>, giving a 5-year prediction window when ages are in years. The <code><a href="../reference/survivehr_config.html">survivehr_config()</a></code> default remains <code>1.0</code> but the recommended value for clinical applications is <code>5.0</code>.</li>
+<li>
+<strong>Clarified <code>time_scale</code> semantics</strong>: <code>time_scale</code> controls <strong>both</strong> the age normalisation divisor and the prediction window length. The survival ODE evaluates over a normalised [0, 1] grid that maps back to [0, <code>time_scale</code>] in raw age units. <code>time_scale</code> is stored inside every model bundle; <code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code> reads it automatically — it does not need to be supplied at inference time. This is now documented in <code><a href="../reference/survivehr_config.html">survivehr_config()</a></code> <code>@param</code>, <code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code> <code>@return</code>, the backend docstring, and the <em>Getting Started</em> vignette (Section 3 and Section 7).</li>
+<li>
+<strong>Biomarker values in examples</strong>: the 10-patient population in <code>R/train.R</code> examples and <code>vignettes/getting-started.Rmd</code> now includes realistic <code>value</code> entries: BP_CHECK readings (138–162 mmHg) and HBA1C readings (68–74 mmol/mol) aligned to the correct event rows.</li>
+<li>
+<strong>Removed FastEHR branding from <code>README.md</code></strong>: the “FastEHR compatibility” row has been removed from the key-features table and the FastEHR alias description in the Input format section has been reworded to plain English.</li>
+</ul></div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.7.6" id="rsurvivehr-076">RSurvivEHR 0.7.6<a class="anchor" aria-label="anchor" href="#rsurvivehr-076"></a></h2>
+<ul><li>
+<strong>Frequency-ordered vocabulary</strong>: event tokens are now assigned IDs in descending frequency order (most common event = smallest ID after reserved tokens <code>&lt;PAD&gt;</code>, <code>&lt;UNK&gt;</code>). Smaller IDs improve embedding compression for common clinical codes. Existing saved models are unaffected because the vocabulary is stored inside every <code>.pt</code> bundle.</li>
+<li>
+<strong>Improved examples throughout</strong>: all R function examples and the <em>Getting Started</em> vignette now use a 10-patient pre-training cohort with three CVD cases providing the outcome token, and a 6-patient fine-tuning subset (3 CVD cases + 3 right-censored controls). Context events are explicitly filtered to remove the outcome (leakage-free).</li>
+<li>
+<strong>Documented prediction outputs and time window</strong>: <code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code> <code>@return</code> now fully documents <code>{outcome}_cdf_last</code> (cumulative incidence at the end of the prediction window = <code>time_scale</code> time units) and <code>{outcome}_auc</code> (area under the CDF = average risk over the window). The vignette explains how to extend the prediction window by changing <code>time_scale</code>.</li>
+<li>
+<strong>Removed FastEHR branding</strong>: <code>fastEHR</code> / <code>FastEHR</code> mentions removed from all documentation, error messages, and parameter descriptions. Uppercase column aliases (<code>PATIENT_ID</code>, <code>EVENT</code>, <code>DAYS_SINCE_BIRTH</code>) continue to work but are described without the FastEHR name.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.7.5" id="rsurvivehr-075">RSurvivEHR 0.7.5<a class="anchor" aria-label="anchor" href="#rsurvivehr-075"></a></h2>
 <ul><li>

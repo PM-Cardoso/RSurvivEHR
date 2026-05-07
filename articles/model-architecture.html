@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.8</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -490,9 +490,14 @@ fine-tuning.</p>
 <hr>
 </div>
 <div class="section level3">
-<h3 id="surv_layer-survival-head-type">
-<code>surv_layer</code> – survival head type<a class="anchor" aria-label="anchor" href="#surv_layer-survival-head-type"></a>
+<h3 id="surv_layer-backbone-time-to-next-event-head">
+<code>surv_layer</code> – backbone time-to-next-event head<a class="anchor" aria-label="anchor" href="#surv_layer-backbone-time-to-next-event-head"></a>
 </h3>
+<p>SurvivEHR pre-training goes beyond standard causal language modelling
+(predicting <em>which</em> event comes next). The backbone also trains a
+survival head to predict <em>when</em> the next event occurs, using the
+age at each sequence position as the time target.
+<code>surv_layer</code> controls how that timing problem is framed:</p>
 <table class="table">
 <colgroup>
 <col width="50%">
@@ -506,16 +511,29 @@ fine-tuning.</p>
 <tr class="odd">
 <td>
 <code>"competing-risk"</code> (default)</td>
-<td>Neural-ODE head with one ODE per outcome event. Models
-cause-specific cumulative incidence functions (CIF).</td>
+<td>Treats each position as a genuine competing-risk problem: only one
+event can be next, so all other vocabulary events are implicitly
+competing. One neural ODE per vocabulary token.</td>
 </tr>
 <tr class="even">
 <td><code>"single-risk"</code></td>
-<td>Neural-ODE head with a single ODE. Used when only one endpoint is of
-interest.</td>
+<td>Fits one independent ODE per vocabulary token in a 1-vs-all fashion,
+treating all other events as censored rather than competing.</td>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Used in both pre-training and fine-tuning</strong> — the
+backbone constructor reads <code>cfg.head.SurvLayer</code> at both
+stages, so the architecture must remain consistent. The
+<strong>outcome-level</strong> head that produces patient predictions is
+controlled separately by the <code>risk_model</code> argument to
+<code><a href="../reference/survivehr_finetune.html">survivehr_finetune()</a></code>. Because they are entirely separate
+<code>nn.Module</code> objects, <code>surv_layer</code> and
+<code>risk_model</code> <strong>can differ</strong> — e.g. pretrain with
+<code>surv_layer = "competing-risk"</code> and fine-tune with
+<code>risk_model = "single-risk"</code> with no conflict.</p>
+</blockquote>
 <p>The upstream config uses the abbreviated codes <code>"cr"</code> and
 <code>"sr"</code> – both are also accepted by RSurvivEHR.</p>
 <hr>
@@ -564,6 +582,11 @@ magnitudes (e.g. BMI, blood pressure).</p>
 <h3 id="include_unk">
 <code>include_unk</code><a class="anchor" aria-label="anchor" href="#include_unk"></a>
 </h3>
+<blockquote>
+<p><strong>Pre-training only.</strong> This setting is fixed when the
+vocabulary is built during <code><a href="../reference/survivehr_pretrain.html">survivehr_pretrain()</a></code> and stored
+in the bundle. The value in a fine-tune config is ignored.</p>
+</blockquote>
 <table class="table">
 <thead><tr class="header">
 <th>RSurvivEHR default</th>
@@ -583,6 +606,11 @@ fine-tune / prediction time is silently mapped to
 <h3 id="include_cls_sep">
 <code>include_cls_sep</code><a class="anchor" aria-label="anchor" href="#include_cls_sep"></a>
 </h3>
+<blockquote>
+<p><strong>Pre-training only.</strong> Fixed at vocabulary build time
+and stored in the bundle. The value in a fine-tune config is
+ignored.</p>
+</blockquote>
 <table class="table">
 <thead><tr class="header">
 <th>RSurvivEHR default</th>
@@ -604,7 +632,26 @@ the upstream GPT-style pre-training.</p>
 <p>All raw ages are divided by <code>time_scale</code> before entering
 the model. <strong>Must be consistent</strong> across pre-training,
 fine-tuning, and prediction.</p>
+<ul>
+<li>
+<strong>Pre-training</strong>: used only for age normalisation —
+there is no prediction window at this stage.</li>
+<li>
+<strong>Fine-tuning</strong>: also defines the prediction window.
+The ODE integrates over
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="false" form="postfix">]</mo></mrow><annotation encoding="application/x-tex">[0,1]</annotation></semantics></math>
+which corresponds to
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">[</mo><mn>0</mn><mo>,</mo><mtext mathvariant="monospace">𝚝𝚒𝚖𝚎_𝚜𝚌𝚊𝚕𝚎</mtext><mo stretchy="false" form="postfix">]</mo></mrow><annotation encoding="application/x-tex">[0, \texttt{time\_scale}]</annotation></semantics></math>
+raw time units, so <code>time_scale = 5.0</code> means the survival
+curves cover a 5-year window. The value is stored in the pretrained
+bundle and reused automatically — you do <strong>not</strong> need to
+repeat it in a fine-tune config.</li>
+</ul>
 <table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
 <thead><tr class="header">
 <th>Age unit</th>
 <th>Recommended <code>time_scale</code>
@@ -613,10 +660,12 @@ fine-tuning, and prediction.</p>
 <tbody>
 <tr class="odd">
 <td>Years (e.g. <code>50.0</code>)</td>
-<td><code>1.0</code></td>
+<td>
+<code>1.0</code> or the desired horizon in years
+(e.g. <code>5.0</code>)</td>
 </tr>
 <tr class="even">
-<td>Days since birth (e.g. <code>18262</code> ~= 50 years)</td>
+<td>Days since birth (e.g. <code>18262</code> ≈ 50 years)</td>
 <td><code>365.25</code></td>
 </tr>
 </tbody>
@@ -702,7 +751,8 @@ frame.</li>
 </ul>
 </li>
 <li>Clinical tokens assigned indices &gt;= 2 (or &gt;= 4 with CLS/SEP),
-sorted <strong>alphabetically</strong>.</li>
+ordered by <strong>frequency — most common event first</strong> (lowest
+index).</li>
 </ol>
 <p>At fine-tuning, outcome codes absent from the vocab are
 <strong>automatically appended</strong> and the embedding layer is

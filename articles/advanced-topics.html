@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.8</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -80,13 +80,77 @@
   1    &lt;UNK&gt;   when include_unk = TRUE (default)
   2    &lt;CLS&gt;   when include_cls_sep = TRUE
   3    &lt;SEP&gt;   when include_cls_sep = TRUE
-  2+   clinical events, alphabetically sorted</code></pre>
+  2+   clinical events, ordered by frequency (most common first)</code></pre>
 <p><code>&lt;PAD&gt;</code> is always index 0 because SurvivEHR’s
 <code>SplitDynamicEmbeddingLayer</code> uses
 <code>padding_idx = 0</code> internally.</p>
 <p>At prediction time any event code not present in
 <code>event_vocab</code> is replaced by <code>&lt;UNK&gt;</code> (index
 1), provided <code>include_unk = TRUE</code>.</p>
+<blockquote>
+<p><strong>Pre-train only.</strong> <code>include_unk</code> and
+<code>include_cls_sep</code> are fixed when the vocabulary is built
+during <code><a href="../reference/survivehr_pretrain.html">survivehr_pretrain()</a></code>. The values stored in the
+bundle are reused automatically at fine-tune and prediction time; any
+<code>include_unk</code> / <code>include_cls_sep</code> values in a
+fine-tune config are ignored.</p>
+</blockquote>
+<hr>
+</div>
+<div class="section level2">
+<h2 id="surv_layer-and-risk_model">
+<code>surv_layer</code> and <code>risk_model</code><a class="anchor" aria-label="anchor" href="#surv_layer-and-risk_model"></a>
+</h2>
+<p><code>surv_layer</code> (in <code><a href="../reference/survivehr_config.html">survivehr_config()</a></code>) and
+<code>risk_model</code> (an argument to
+<code><a href="../reference/survivehr_finetune.html">survivehr_finetune()</a></code>) look similar but refer to
+<strong>different survival heads</strong>:</p>
+<table class="table">
+<colgroup>
+<col width="33%">
+<col width="33%">
+<col width="33%">
+</colgroup>
+<thead><tr class="header">
+<th>Parameter</th>
+<th>Where</th>
+<th>Controls</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>surv_layer</code></td>
+<td><code><a href="../reference/survivehr_config.html">survivehr_config()</a></code></td>
+<td>The <strong>backbone time-to-next-event head</strong>. Pre-training
+is not just “predict which event comes next” — it also trains a survival
+ODE to predict <em>when</em> the next event occurs, using age as the
+time axis. <code>surv_layer</code> frames this as competing-risk (one
+event can be next; all others compete) or single-risk (each token
+modelled independently 1-vs-all). Active during <strong>both</strong>
+pre-training and fine-tuning; the backbone architecture must remain
+consistent.</td>
+</tr>
+<tr class="even">
+<td><code>risk_model</code></td>
+<td>
+<code><a href="../reference/survivehr_finetune.html">survivehr_finetune()</a></code> arg</td>
+<td>The <strong>outcome-level head</strong> added on top of the backbone
+— predicts patient-level CIF curves for the specific labelled outcomes.
+A brand-new, freshly initialised <code>nn.Module</code> that is never
+touched during pre-training and sits beside the backbone. Entirely
+independent of <code>surv_layer</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Because they control completely separate modules,
+<strong><code>surv_layer</code> and <code>risk_model</code> can be set
+differently without any conflict</strong>. For example, you can pretrain
+with <code>surv_layer = "competing-risk"</code> and then fine-tune with
+<code>risk_model = "single-risk"</code>, or vice versa.</p>
+<p>In practice, leave <code>surv_layer = "competing-risk"</code> (the
+default) unless you have a specific reason to change it, and use
+<code>risk_model</code> in <code><a href="../reference/survivehr_finetune.html">survivehr_finetune()</a></code> to choose
+<code>"competing-risk"</code> (multiple outcomes) or
+<code>"single-risk"</code> (one outcome).</p>
 <hr>
 </div>
 <div class="section level2">
@@ -95,13 +159,23 @@
 <p>All raw ages are divided by <code>time_scale</code> before entering
 the model:</p>
 <p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>a</mi><mtext mathvariant="normal">norm</mtext></msub><mo>=</mo><mfrac><msub><mi>a</mi><mtext mathvariant="normal">raw</mtext></msub><mtext mathvariant="monospace">𝚝𝚒𝚖𝚎_𝚜𝚌𝚊𝚕𝚎</mtext></mfrac></mrow><annotation encoding="application/x-tex">a_{\text{norm}} = \frac{a_{\text{raw}}}{\texttt{time\_scale}}</annotation></semantics></math></p>
-<p>The target time delta for fine-tuning is:</p>
+<p><strong>During pre-training</strong>, this is the only role of
+<code>time_scale</code> — it controls how ages are scaled before being
+fed to the transformer. There is no prediction window during
+pre-training.</p>
+<p><strong>During fine-tuning</strong>, <code>time_scale</code>
+additionally defines the prediction window: the target time delta is
+normalised by the same divisor,</p>
 <p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>δ</mi><mtext mathvariant="normal">norm</mtext></msub><mo>=</mo><mfrac><mrow><msub><mi>a</mi><mtext mathvariant="normal">target</mtext></msub><mo>−</mo><msub><mi>a</mi><mtext mathvariant="normal">last context</mtext></msub></mrow><mtext mathvariant="monospace">𝚝𝚒𝚖𝚎_𝚜𝚌𝚊𝚕𝚎</mtext></mfrac></mrow><annotation encoding="application/x-tex">\delta_{\text{norm}} = \frac{a_{\text{target}} - a_{\text{last context}}}{\texttt{time\_scale}}</annotation></semantics></math></p>
-<p>Use <code>time_scale = 1.0</code> (default) when ages are already in
+<p>so the ODE integrates over
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="false" form="postfix">]</mo></mrow><annotation encoding="application/x-tex">[0, 1]</annotation></semantics></math>
+which maps to
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">[</mo><mn>0</mn><mo>,</mo><mtext mathvariant="monospace">𝚝𝚒𝚖𝚎_𝚜𝚌𝚊𝚕𝚎</mtext><mo stretchy="false" form="postfix">]</mo></mrow><annotation encoding="application/x-tex">[0, \texttt{time\_scale}]</annotation></semantics></math>
+raw years (or whatever unit your ages are in).</p>
+<p>Use <code>time_scale = 1.0</code> (default) when ages are in
 <strong>years</strong>.<br>
-Use <code>time_scale = 1825.0</code> when ages are in <strong>days since
-birth</strong>, matching FastEHR’s <code>DAYS_SINCE_BIRTH</code>
-convention (1825 days ≈ 5 years).</p>
+Use <code>time_scale = 365.25</code> when ages are in
+<strong>days</strong> (e.g. 18 262 days ≈ 50 years).</p>
 <p>The <code>time_scale</code> is stored in the model bundle and
 automatically applied at fine-tune and predict time, so you only need to
 set it once in <code><a href="../reference/survivehr_config.html">survivehr_config()</a></code>.</p>
@@ -135,16 +209,17 @@ patient:</p>
 </tbody>
 </table>
 <blockquote>
-<p><strong>Column naming rule</strong>: <code>patient_id</code> (or
-<code>PATIENT_ID</code>) is the only reserved name in the static table.
-All other column names are <strong>user-defined</strong> — call them
-<code>SEX</code>, <code>imd</code>, <code>YearOfBirth</code>, or
-anything else. The column names become the basis for encoded feature
-names (e.g. <code>SEX</code> → <code>SEX_F</code>, <code>SEX_M</code>).
-This is in contrast to the <strong>events</strong> and
-<strong>targets</strong> tables, which require fixed column names
-(<code>patient_id</code>, <code>event</code>, <code>age</code>,
-<code>value</code>) or their FastEHR UPPER_CASE aliases. The only
+<p><strong>Column naming rule</strong>: <code>patient_id</code> (or the
+uppercase alias <code>PATIENT_ID</code>) is the only reserved name in
+the static table. All other column names are
+<strong>user-defined</strong> — call them <code>SEX</code>,
+<code>imd</code>, <code>YearOfBirth</code>, or anything else. The column
+names become the basis for encoded feature names (e.g. <code>SEX</code>
+→ <code>SEX_F</code>, <code>SEX_M</code>). This is in contrast to the
+<strong>events</strong> and <strong>targets</strong> tables, which
+require fixed column names (<code>patient_id</code>, <code>event</code>,
+<code>age</code>, <code>value</code>) — see the <em>Column name
+aliases</em> section below for accepted uppercase alternatives. The only
 constraint for static columns is <strong>consistency</strong>: the exact
 same names must be used at pretrain, fine-tune, and predict time.</p>
 </blockquote>
@@ -190,13 +265,13 @@ model weights are comparable.</p>
 <hr>
 </div>
 <div class="section level2">
-<h2 id="fastehr-column-aliases">FastEHR column aliases<a class="anchor" aria-label="anchor" href="#fastehr-column-aliases"></a>
+<h2 id="column-name-aliases">Column name aliases<a class="anchor" aria-label="anchor" href="#column-name-aliases"></a>
 </h2>
-<p>All functions accept the uppercase column names used by FastEHR:</p>
+<p>All functions accept lowercase or uppercase column names:</p>
 <table class="table">
 <thead><tr class="header">
-<th>RSurvivEHR name</th>
-<th>FastEHR alias</th>
+<th>Standard name</th>
+<th>Accepted alias</th>
 </tr></thead>
 <tbody>
 <tr class="odd">
@@ -229,97 +304,127 @@ model weights are comparable.</p>
 </tr>
 </tbody>
 </table>
-<p>When <code>DAYS_SINCE_BIRTH</code> is used, remember to set
-<code>time_scale = 1825.0</code> in <code><a href="../reference/survivehr_config.html">survivehr_config()</a></code>.</p>
+<p>The <code>DAYS_SINCE_BIRTH</code> alias exists for compatibility with
+datasets where ages are stored as days rather than years. If you use it,
+set <code>time_scale = 365.25</code> in <code><a href="../reference/survivehr_config.html">survivehr_config()</a></code>
+so ages are normalised to year-scale before entering the model.</p>
 <hr>
 </div>
 <div class="section level2">
-<h2 id="full-6-patient-worked-example">Full 6-patient worked example<a class="anchor" aria-label="anchor" href="#full-6-patient-worked-example"></a>
+<h2 id="full-worked-example">Full worked example<a class="anchor" aria-label="anchor" href="#full-worked-example"></a>
 </h2>
-<p>This section walks through a complete analysis on 6 synthetic
-patients.</p>
+<p>This section reproduces the complete pipeline from the Getting
+Started vignette in a single self-contained block, demonstrating every
+best practice: leakage-free context construction, targets defined before
+context filtering, and the competing-risk fine-tune on two outcomes.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://pm-cardoso.github.io/RSurvivEHR/">RSurvivEHR</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># ── 1. Data ─────────────────────────────────────────────────────────────────</span></span>
-<span><span class="va">all_events</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  patient_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>,<span class="fl">1</span>,<span class="fl">1</span>,<span class="fl">1</span>,<span class="fl">1</span>,<span class="fl">1</span>,  <span class="fl">2</span>,<span class="fl">2</span>,<span class="fl">2</span>,<span class="fl">2</span>,<span class="fl">2</span>,  <span class="fl">3</span>,<span class="fl">3</span>,<span class="fl">3</span>,<span class="fl">3</span>,<span class="fl">3</span>,  <span class="fl">4</span>,<span class="fl">4</span>,<span class="fl">4</span>,<span class="fl">4</span>,<span class="fl">4</span>,  <span class="fl">5</span>,<span class="fl">5</span>,<span class="fl">5</span>,<span class="fl">5</span>,<span class="fl">5</span>,<span class="fl">5</span>,  <span class="fl">6</span>,<span class="fl">6</span>,<span class="fl">6</span>,<span class="fl">6</span>,<span class="fl">6</span>,<span class="fl">6</span><span class="op">)</span>,</span>
+<span><span class="co"># ── 1. Data (same population as the Getting Started vignette) ────────────────</span></span>
+<span><span class="va">events_pop</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  patient_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span>,<span class="fl">4</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">2</span>,<span class="fl">6</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">3</span>,<span class="fl">6</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">4</span>,<span class="fl">4</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">5</span>,<span class="fl">6</span><span class="op">)</span>,</span>
+<span>                 <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">6</span>,<span class="fl">4</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">7</span>,<span class="fl">4</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">8</span>,<span class="fl">4</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">9</span>,<span class="fl">6</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">10</span>,<span class="fl">4</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  event <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>    <span class="st">"HYPERTENSION"</span>,<span class="st">"STATIN"</span>,<span class="st">"T2D"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"HBA1C"</span>,<span class="st">"METFORMIN"</span>,</span>
-<span>    <span class="st">"T2D"</span>,<span class="st">"METFORMIN"</span>,<span class="st">"HBA1C"</span>,<span class="st">"HYPERTENSION"</span>,<span class="st">"STATIN"</span>,</span>
-<span>    <span class="st">"STATIN"</span>,<span class="st">"T2D"</span>,<span class="st">"METFORMIN"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"HBA1C"</span>,</span>
-<span>    <span class="st">"HYPERTENSION"</span>,<span class="st">"AMLODIPINE"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"STATIN"</span>,<span class="st">"T2D"</span>,</span>
-<span>    <span class="st">"T2D"</span>,<span class="st">"STATIN"</span>,<span class="st">"HBA1C"</span>,<span class="st">"HYPERTENSION"</span>,<span class="st">"METFORMIN"</span>,<span class="st">"CVD"</span>,</span>
-<span>    <span class="st">"T2D"</span>,<span class="st">"HYPERTENSION"</span>,<span class="st">"STATIN"</span>,<span class="st">"BMI"</span>,<span class="st">"METFORMIN"</span>,<span class="st">"DEATH"</span></span>
+<span>    <span class="st">"HYPERTENSION"</span>,<span class="st">"STATIN"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"CVD"</span>,</span>
+<span>    <span class="st">"HYPERTENSION"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"T2D"</span>,<span class="st">"METFORMIN"</span>,<span class="st">"HYPERTENSION"</span>,<span class="st">"CVD"</span>,</span>
+<span>    <span class="st">"HYPERTENSION"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"STATIN"</span>,<span class="st">"T2D"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"CVD"</span>,</span>
+<span>    <span class="st">"HYPERTENSION"</span>,<span class="st">"STATIN"</span>,<span class="st">"T2D"</span>,<span class="st">"METFORMIN"</span>,</span>
+<span>    <span class="st">"HYPERTENSION"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"T2D"</span>,<span class="st">"HBA1C"</span>,<span class="st">"METFORMIN"</span>,<span class="st">"STATIN"</span>,</span>
+<span>    <span class="st">"HYPERTENSION"</span>,<span class="st">"AMLODIPINE"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"STATIN"</span>,</span>
+<span>    <span class="st">"STATIN"</span>,<span class="st">"T2D"</span>,<span class="st">"HBA1C"</span>,<span class="st">"METFORMIN"</span>,</span>
+<span>    <span class="st">"HYPERTENSION"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"STATIN"</span>,<span class="st">"T2D"</span>,</span>
+<span>    <span class="st">"HYPERTENSION"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"T2D"</span>,<span class="st">"METFORMIN"</span>,<span class="st">"HBA1C"</span>,<span class="st">"STATIN"</span>,</span>
+<span>    <span class="st">"STATIN"</span>,<span class="st">"BP_CHECK"</span>,<span class="st">"HYPERTENSION"</span>,<span class="st">"T2D"</span></span>
 <span>  <span class="op">)</span>,</span>
 <span>  age <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>    <span class="fl">50.0</span>, <span class="fl">50.5</span>, <span class="fl">52.0</span>, <span class="fl">52.1</span>, <span class="fl">52.3</span>, <span class="fl">52.5</span>,</span>
-<span>    <span class="fl">45.0</span>, <span class="fl">45.3</span>, <span class="fl">46.0</span>, <span class="fl">47.5</span>, <span class="fl">48.0</span>,</span>
-<span>    <span class="fl">58.0</span>, <span class="fl">60.1</span>, <span class="fl">60.4</span>, <span class="fl">61.5</span>, <span class="fl">62.0</span>,</span>
-<span>    <span class="fl">55.0</span>, <span class="fl">55.4</span>, <span class="fl">56.0</span>, <span class="fl">57.2</span>, <span class="fl">58.0</span>,</span>
-<span>    <span class="fl">48.0</span>, <span class="fl">48.6</span>, <span class="fl">49.0</span>, <span class="fl">49.1</span>, <span class="fl">50.5</span>, <span class="fl">51.2</span>,</span>
-<span>    <span class="fl">60.0</span>, <span class="fl">60.8</span>, <span class="fl">62.5</span>, <span class="fl">62.8</span>, <span class="fl">63.0</span>, <span class="fl">64.1</span></span>
+<span>    <span class="fl">55.0</span>, <span class="fl">55.5</span>, <span class="fl">56.2</span>, <span class="fl">58.0</span>,</span>
+<span>    <span class="fl">44.0</span>, <span class="fl">45.5</span>, <span class="fl">48.0</span>, <span class="fl">48.3</span>, <span class="fl">50.5</span>, <span class="fl">52.0</span>,</span>
+<span>    <span class="fl">58.0</span>, <span class="fl">59.5</span>, <span class="fl">62.0</span>, <span class="fl">63.5</span>, <span class="fl">64.0</span>, <span class="fl">65.5</span>,</span>
+<span>    <span class="fl">45.0</span>, <span class="fl">45.5</span>, <span class="fl">47.0</span>, <span class="fl">48.3</span>,</span>
+<span>    <span class="fl">48.0</span>, <span class="fl">49.0</span>, <span class="fl">51.0</span>, <span class="fl">52.0</span>, <span class="fl">53.0</span>, <span class="fl">54.5</span>,</span>
+<span>    <span class="fl">60.0</span>, <span class="fl">61.0</span>, <span class="fl">62.3</span>, <span class="fl">63.0</span>,</span>
+<span>    <span class="fl">40.0</span>, <span class="fl">42.0</span>, <span class="fl">43.5</span>, <span class="fl">44.8</span>,</span>
+<span>    <span class="fl">58.0</span>, <span class="fl">59.2</span>, <span class="fl">60.0</span>, <span class="fl">62.0</span>,</span>
+<span>    <span class="fl">46.0</span>, <span class="fl">47.5</span>, <span class="fl">50.0</span>, <span class="fl">52.0</span>, <span class="fl">52.5</span>, <span class="fl">54.0</span>,</span>
+<span>    <span class="fl">44.0</span>, <span class="fl">46.5</span>, <span class="fl">47.0</span>, <span class="fl">48.5</span></span>
 <span>  <span class="op">)</span>,</span>
 <span>  value <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>    <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="fl">152</span>, <span class="fl">54</span>,  <span class="cn">NA</span>,   <span class="co"># p1: BP_CHECK=152 mmHg, HBA1C=54 mmol/mol</span></span>
-<span>    <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="fl">61</span>,  <span class="cn">NA</span>,  <span class="cn">NA</span>,        <span class="co"># p2: HBA1C=61 mmol/mol</span></span>
-<span>    <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="fl">145</span>, <span class="fl">58</span>,        <span class="co"># p3: BP_CHECK=145 mmHg, HBA1C=58 mmol/mol</span></span>
-<span>    <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="fl">168</span>, <span class="cn">NA</span>,  <span class="cn">NA</span>,        <span class="co"># p4: BP_CHECK=168 mmHg (hypertensive)</span></span>
-<span>    <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="fl">67</span>,  <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="cn">NA</span>,   <span class="co"># p5: HBA1C=67 mmol/mol (poorly controlled)</span></span>
-<span>    <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="fl">32.1</span>,<span class="cn">NA</span>,  <span class="cn">NA</span>    <span class="co"># p6: BMI=32.1 kg/m² (obese)</span></span>
+<span>    <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="fl">148</span>, <span class="cn">NA</span>,</span>
+<span>    <span class="cn">NA</span>,  <span class="fl">145</span>, <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="cn">NA</span>,</span>
+<span>    <span class="cn">NA</span>,  <span class="fl">158</span>, <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="fl">162</span>, <span class="cn">NA</span>,</span>
+<span>    <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="cn">NA</span>,</span>
+<span>    <span class="cn">NA</span>,  <span class="fl">152</span>, <span class="cn">NA</span>,  <span class="fl">68</span>,  <span class="cn">NA</span>,  <span class="cn">NA</span>,</span>
+<span>    <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="fl">155</span>, <span class="cn">NA</span>,</span>
+<span>    <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="fl">74</span>,  <span class="cn">NA</span>,</span>
+<span>    <span class="cn">NA</span>,  <span class="fl">145</span>, <span class="cn">NA</span>,  <span class="cn">NA</span>,</span>
+<span>    <span class="cn">NA</span>,  <span class="fl">138</span>, <span class="cn">NA</span>,  <span class="cn">NA</span>,  <span class="fl">71</span>,  <span class="cn">NA</span>,</span>
+<span>    <span class="cn">NA</span>,  <span class="fl">138</span>, <span class="cn">NA</span>,  <span class="cn">NA</span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">static_covariates</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  patient_id     <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">6</span>,</span>
-<span>  SEX            <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span><span class="op">)</span>,</span>
-<span>  ETHNICITY      <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"White"</span>,<span class="st">"Asian"</span>,<span class="st">"White"</span>,<span class="st">"White"</span>,<span class="st">"Black"</span>,<span class="st">"White"</span><span class="op">)</span>,</span>
-<span>  SMOKING_STATUS <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Never"</span>,<span class="st">"Never"</span>,<span class="st">"Ex"</span>,<span class="st">"Never"</span>,<span class="st">"Ex"</span>,<span class="st">"Never"</span><span class="op">)</span>,</span>
-<span>  IMD            <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span>, <span class="fl">3L</span><span class="op">)</span>,</span>
-<span>  YEAR_OF_BIRTH  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1965L</span>,<span class="fl">1972L</span>,<span class="fl">1955L</span>,<span class="fl">1960L</span>,<span class="fl">1968L</span>,<span class="fl">1958L</span><span class="op">)</span></span>
+<span><span class="va">static_pop</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  patient_id    <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span>,</span>
+<span>  SEX           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span><span class="op">)</span>,</span>
+<span>  ETHNICITY     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"White"</span>,<span class="st">"Asian"</span>,<span class="st">"White"</span>,<span class="st">"Black"</span>,<span class="st">"White"</span>,</span>
+<span>                    <span class="st">"Asian"</span>,<span class="st">"White"</span>,<span class="st">"White"</span>,<span class="st">"Black"</span>,<span class="st">"White"</span><span class="op">)</span>,</span>
+<span>  IMD           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span>, <span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span><span class="op">)</span>,</span>
+<span>  YEAR_OF_BIRTH <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1960L</span>,<span class="fl">1970L</span>,<span class="fl">1952L</span>,<span class="fl">1975L</span>,<span class="fl">1963L</span>,<span class="fl">1958L</span>,<span class="fl">1978L</span>,<span class="fl">1960L</span>,<span class="fl">1968L</span>,<span class="fl">1975L</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># ── 2. Config ────────────────────────────────────────────────────────────────</span></span>
+<span><span class="co"># ── 2. Config ─────────────────────────────────────────────────────────────────</span></span>
+<span><span class="co"># time_scale = 5.0 → 5-year prediction window; stored in pretrained bundle</span></span>
+<span><span class="co"># and inherited automatically at fine-tune and prediction time.</span></span>
 <span><span class="va">cfg</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_config.html">survivehr_config</a></span><span class="op">(</span></span>
-<span>  block_size <span class="op">=</span> <span class="fl">32</span>, n_layer <span class="op">=</span> <span class="fl">2</span>, n_head <span class="op">=</span> <span class="fl">2</span>, n_embd <span class="op">=</span> <span class="fl">64</span>,</span>
-<span>  epochs <span class="op">=</span> <span class="fl">2</span>, batch_size <span class="op">=</span> <span class="fl">4</span>,</span>
+<span>  block_size <span class="op">=</span> <span class="fl">64</span>, n_layer <span class="op">=</span> <span class="fl">2</span>, n_head <span class="op">=</span> <span class="fl">2</span>, n_embd <span class="op">=</span> <span class="fl">64</span>,</span>
+<span>  epochs <span class="op">=</span> <span class="fl">10</span>, batch_size <span class="op">=</span> <span class="fl">4</span>,</span>
 <span>  surv_layer <span class="op">=</span> <span class="st">"competing-risk"</span>,</span>
-<span>  time_scale <span class="op">=</span> <span class="fl">1.0</span></span>
+<span>  time_scale <span class="op">=</span> <span class="fl">5.0</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># ── 3. Pre-train on all patients ─────────────────────────────────────────────</span></span>
-<span><span class="va">pt</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_pretrain.html">survivehr_pretrain</a></span><span class="op">(</span><span class="va">all_events</span>, <span class="va">static_covariates</span>, <span class="va">cfg</span><span class="op">)</span></span>
+<span><span class="co"># ── 3. Pre-train on all 10 patients ───────────────────────────────────────────</span></span>
+<span><span class="va">pt</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_pretrain.html">survivehr_pretrain</a></span><span class="op">(</span><span class="va">events_pop</span>, <span class="va">static_pop</span>, <span class="va">cfg</span><span class="op">)</span></span>
+<span><span class="co"># Vocabulary ordered by frequency (most common first):</span></span>
+<span><span class="co"># &lt;PAD&gt;=0, &lt;UNK&gt;=1, HYPERTENSION=2, BP_CHECK=3, T2D=4, STATIN=5, ...</span></span>
 <span><span class="va">pt</span><span class="op">$</span><span class="va">event_vocab</span></span>
-<span><span class="co"># &lt;PAD&gt;=0, &lt;UNK&gt;=1, AMLODIPINE=2, BMI=3, BP_CHECK=4, CVD=5,</span></span>
-<span><span class="co"># DEATH=6, HBA1C=7, HYPERTENSION=8, METFORMIN=9, STATIN=10, T2D=11</span></span>
 <span></span>
-<span><span class="co"># ── 4. Fine-tune on CVD / DEATH (patients 5 &amp; 6) ────────────────────────────</span></span>
-<span><span class="co"># Context = all events BEFORE the labelled outcome age (leakage-free)</span></span>
-<span><span class="va">ft_events</span> <span class="op">&lt;-</span> <span class="va">all_events</span><span class="op">[</span><span class="op">!</span><span class="va">all_events</span><span class="op">$</span><span class="va">event</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"CVD"</span>,<span class="st">"DEATH"</span><span class="op">)</span>, <span class="op">]</span></span>
+<span><span class="fu"><a href="../reference/survivehr_save_model.html">survivehr_save_model</a></span><span class="op">(</span><span class="va">pt</span>, <span class="st">"pretrain_backbone.pt"</span><span class="op">)</span></span>
 <span></span>
+<span><span class="co"># ── 4. Fine-tune: competing-risk CVD vs T2D (patients 1–6) ───────────────────</span></span>
+<span><span class="va">ft_static</span> <span class="op">&lt;-</span> <span class="va">static_pop</span><span class="op">[</span><span class="va">static_pop</span><span class="op">$</span><span class="va">patient_id</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="op">]</span></span>
+<span></span>
+<span><span class="co"># Define targets FIRST — the outcome age sets the context cut-off</span></span>
 <span><span class="va">targets</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  patient_id   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">5L</span>, <span class="fl">6L</span><span class="op">)</span>,</span>
-<span>  target_event <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"CVD"</span>, <span class="st">"DEATH"</span><span class="op">)</span>,</span>
-<span>  target_age   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">51.2</span>, <span class="fl">64.1</span><span class="op">)</span></span>
+<span>  patient_id   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1L</span>,    <span class="fl">2L</span>,    <span class="fl">3L</span>,    <span class="fl">4L</span>,    <span class="fl">5L</span>,    <span class="fl">6L</span><span class="op">)</span>,</span>
+<span>  target_event <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"CVD"</span>, <span class="st">"T2D"</span>, <span class="st">"T2D"</span>, <span class="st">"T2D"</span>, <span class="st">"T2D"</span>, <span class="st">"STATIN"</span><span class="op">)</span>,</span>
+<span>  target_age   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">58.0</span>,  <span class="fl">48.0</span>,  <span class="fl">63.5</span>,  <span class="fl">47.0</span>,  <span class="fl">51.0</span>,  <span class="fl">63.0</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co"># Patient 5: last context age = 50.5  → delta = (51.2 - 50.5) / 1.0 = 0.7</span></span>
-<span><span class="co"># Patient 6: last context age = 63.0  → delta = (64.1 - 63.0) / 1.0 = 1.1</span></span>
+<span><span class="co"># p1: CVD case.  p2–p5: T2D occurred first (CVD is the competing event for p2/p3).</span></span>
+<span><span class="co"># p6: censored — neither CVD nor T2D observed.</span></span>
+<span></span>
+<span><span class="co"># Build context: remove both outcome codes AND events after the target age</span></span>
+<span><span class="va">ft_events</span> <span class="op">&lt;-</span> <span class="va">events_pop</span><span class="op">[</span><span class="va">events_pop</span><span class="op">$</span><span class="va">patient_id</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fl">1</span><span class="op">:</span><span class="fl">6</span> <span class="op">&amp;</span></span>
+<span>                           <span class="op">!</span><span class="va">events_pop</span><span class="op">$</span><span class="va">event</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"CVD"</span>, <span class="st">"T2D"</span><span class="op">)</span>, <span class="op">]</span></span>
+<span><span class="va">ft_events</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">ft_events</span>, <span class="va">targets</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"patient_id"</span>, <span class="st">"target_age"</span><span class="op">)</span><span class="op">]</span>, by <span class="op">=</span> <span class="st">"patient_id"</span><span class="op">)</span></span>
+<span><span class="va">ft_events</span> <span class="op">&lt;-</span> <span class="va">ft_events</span><span class="op">[</span><span class="va">ft_events</span><span class="op">$</span><span class="va">age</span> <span class="op">&lt;</span> <span class="va">ft_events</span><span class="op">$</span><span class="va">target_age</span>,</span>
+<span>                        <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"patient_id"</span>, <span class="st">"event"</span>, <span class="st">"age"</span>, <span class="st">"value"</span><span class="op">)</span><span class="op">]</span></span>
 <span></span>
 <span><span class="va">ft</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_finetune.html">survivehr_finetune</a></span><span class="op">(</span></span>
 <span>  events            <span class="op">=</span> <span class="va">ft_events</span>,</span>
 <span>  targets           <span class="op">=</span> <span class="va">targets</span>,</span>
-<span>  outcomes          <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"CVD"</span>, <span class="st">"DEATH"</span><span class="op">)</span>,</span>
+<span>  outcomes          <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"CVD"</span>, <span class="st">"T2D"</span><span class="op">)</span>,   <span class="co"># two competing outcomes</span></span>
 <span>  risk_model        <span class="op">=</span> <span class="st">"competing-risk"</span>,</span>
-<span>  static_covariates <span class="op">=</span> <span class="va">static_covariates</span>,</span>
+<span>  static_covariates <span class="op">=</span> <span class="va">ft_static</span>,</span>
 <span>  config            <span class="op">=</span> <span class="va">cfg</span>,</span>
-<span>  pretrained_model  <span class="op">=</span> <span class="va">pt</span></span>
+<span>  pretrained_model  <span class="op">=</span> <span class="va">pt</span>   <span class="co"># vocabulary, time_scale, and weights all inherited</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># ── 5. Predict on context patients ───────────────────────────────────────────</span></span>
-<span><span class="va">preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_predict.html">survivehr_predict</a></span><span class="op">(</span><span class="va">ft</span>, <span class="va">ft_events</span>, <span class="va">static_covariates</span><span class="op">)</span></span>
+<span><span class="co"># ── 5. Predict on the full cohort (outcome codes removed from context) ────────</span></span>
+<span><span class="va">pred_events</span> <span class="op">&lt;-</span> <span class="va">events_pop</span><span class="op">[</span><span class="op">!</span><span class="va">events_pop</span><span class="op">$</span><span class="va">event</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"CVD"</span>, <span class="st">"T2D"</span><span class="op">)</span>, <span class="op">]</span></span>
+<span><span class="va">preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_predict.html">survivehr_predict</a></span><span class="op">(</span><span class="va">ft</span>, <span class="va">pred_events</span>, <span class="va">static_pop</span><span class="op">)</span></span>
+<span><span class="co"># Columns: patient_id, CVD_cdf_last, CVD_auc, T2D_cdf_last, T2D_auc</span></span>
 <span><span class="va">preds</span></span>
 <span></span>
-<span><span class="co"># ── 6. Save / load round-trip ────────────────────────────────────────────────</span></span>
+<span><span class="co"># ── 6. Save / load round-trip ─────────────────────────────────────────────────</span></span>
 <span><span class="va">tmp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".pt"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/survivehr_save_model.html">survivehr_save_model</a></span><span class="op">(</span><span class="va">ft</span>, <span class="va">tmp</span><span class="op">)</span></span>
 <span><span class="va">ft2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_load_model.html">survivehr_load_model</a></span><span class="op">(</span><span class="va">tmp</span><span class="op">)</span></span>

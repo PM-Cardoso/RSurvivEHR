@@ -1,6 +1,13 @@
-# Save a SurvivEHR model bundle
+# Save an RSurvivEHR model bundle to disk
 
-Save a SurvivEHR model bundle
+Serialises a model bundle (returned by
+[`survivehr_pretrain()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_pretrain.md)
+or
+[`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md))
+to a `.pt` file. The bundle includes the model weights, vocabulary,
+static column schema, `time_scale`, token policy, and training history.
+Reload with
+[`survivehr_load_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_load_model.md).
 
 ## Usage
 
@@ -12,11 +19,11 @@ survivehr_save_model(model_bundle, path)
 
 - model_bundle:
 
-  object returned by training functions.
+  A model bundle returned by a training function.
 
 - path:
 
-  file path ending in `.pt`.
+  File path for the output file. Should end in `.pt`.
 
 ## Value
 
