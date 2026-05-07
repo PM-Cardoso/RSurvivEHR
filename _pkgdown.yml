@@ -65,6 +65,8 @@ navbar:
           href: articles/advanced-topics.html
         - text: "Model architecture & parameter reference"
           href: articles/model-architecture.html
+        - text: "Data pipeline internals"
+          href: articles/data-pipeline.html
     github:
       icon: fab fa-github
       href: https://github.com/PM-Cardoso/RSurvivEHR
