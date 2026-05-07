@@ -2,19 +2,24 @@
 % Please edit documentation in R/train.R
 \name{survivehr_load_model}
 \alias{survivehr_load_model}
-\title{Load a SurvivEHR model bundle}
+\title{Load an RSurvivEHR model bundle from disk}
 \usage{
 survivehr_load_model(path)
 }
 \arguments{
-\item{path}{file path created by \code{survivehr_save_model()}.}
+\item{path}{File path to a \code{.pt} bundle created by
+\code{survivehr_save_model()}.}
 }
 \value{
-Named list (model bundle) identical in structure to the original
-bundle returned by \code{survivehr_finetune()}.
+A named list (model bundle) with elements \code{model},
+\code{event_vocab}, \code{inv_vocab}, \code{config}, \code{time_scale}, \code{token_policy},
+\code{history}, and \code{device}.
 }
 \description{
-Load a SurvivEHR model bundle
+Restores a model bundle previously saved with \code{survivehr_save_model()}.
+The returned object is identical in structure to the original bundle and
+can be passed directly to \code{survivehr_predict()} or used as
+\code{pretrained_model} in a further \code{survivehr_finetune()} call.
 }
 \examples{
 \dontrun{

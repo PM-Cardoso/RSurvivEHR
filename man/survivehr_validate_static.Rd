@@ -2,19 +2,32 @@
 % Please edit documentation in R/validate.R
 \name{survivehr_validate_static}
 \alias{survivehr_validate_static}
-\title{Validate static covariates schema for SurvivEHR}
+\title{Validate the static covariates data frame for RSurvivEHR}
 \usage{
 survivehr_validate_static(static_covariates)
 }
 \arguments{
-\item{static_covariates}{data.frame with patient id and covariates. Accepts
-\code{patient_id} or \code{PATIENT_ID}.}
+\item{static_covariates}{A \code{data.frame} with a \code{patient_id} column (or
+\code{PATIENT_ID}) plus any number of covariate columns with freely chosen
+names.  Pass the \strong{same columns in the same order} across pretrain,
+fine-tune, and prediction.}
 }
 \value{
-Invisibly returns TRUE.
+Invisibly returns \code{TRUE}.  Prints a confirmation message on
+success.
 }
 \description{
-Validate static covariates schema for SurvivEHR
+Checks that the static covariates data frame has a \code{patient_id} column
+and at least one covariate column.  Issues a warning (not an error) when
+no covariate columns are found, because the backend will substitute an
+intercept column in that case.
+}
+\details{
+Categorical columns (those that are less than 80\\% numeric) are
+one-hot encoded automatically by the Python backend.  Numeric columns
+are passed through unchanged.  The exact encoded column list is stored
+inside every model bundle; passing different columns at prediction time
+raises a descriptive error.
 }
 \examples{
 static <- data.frame(

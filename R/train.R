@@ -1,24 +1,106 @@
-#' Train a pretrain SurvivEHR model from R data frames
+#' Pre-train the RSurvivEHR backbone transformer
 #'
-#' @param events data.frame with columns patient_id, event, age, optional value.
-#' @param static_covariates optional data.frame with patient_id + numeric columns.
-#' @param config list from `survivehr_config()`.
-#' @param event_vocab optional named integer map to keep fixed tokenization.
-#' @return A named list (model bundle) with elements `model`, `event_vocab`,
-#'   `inv_vocab`, `config`, `time_scale`, `token_policy`, `history`, and
-#'   `device` (a string such as `"cpu"` or `"cuda:0"`).
+#' Builds the event vocabulary from the supplied event history, then
+#' pre-trains the transformer backbone with a competing-risk or single-risk
+#' survival head that predicts **when** the next clinical event will occur
+#' (over all vocabulary tokens).  The resulting model bundle can be passed
+#' directly to `survivehr_finetune()` or saved with `survivehr_save_model()`
+#' for later reuse.
+#'
+#' Pre-training does **not** require a `targets` frame — the next-event age
+#' in each patient's raw sequence serves as the supervision signal.
+#'
+#' @param events A `data.frame` with columns `patient_id`, `event`, `age`
+#'   (and optionally `value`).  Validated with
+#'   `survivehr_validate_events()` before being passed to Python.
+#' @param static_covariates An optional `data.frame` with `patient_id` and
+#'   covariate columns.  Categorical columns are one-hot encoded
+#'   automatically; numeric columns pass through unchanged.  Pass `NULL`
+#'   (default) to train without static features.
+#' @param config A named list from `survivehr_config()` specifying
+#'   architecture and training hyperparameters.
+#' @param event_vocab An optional named integer vector fixing the token
+#'   mapping.  Useful when pre-training multiple models that must share
+#'   the same vocabulary.  `NULL` (default) builds the vocabulary from
+#'   the supplied events, ordered by descending frequency.
+#' @return A named list (model bundle) with elements:
+#'   \describe{
+#'     \item{`model`}{The trained PyTorch model object.}
+#'     \item{`event_vocab`}{Named integer vector mapping event codes to
+#'       token IDs (frequency-descending order, most common = smallest ID).}
+#'     \item{`inv_vocab`}{Reverse mapping from token IDs to event codes.}
+#'     \item{`config`}{The configuration used for training.}
+#'     \item{`time_scale`}{The prediction window / age normalisation divisor
+#'       stored in the bundle.}
+#'     \item{`token_policy`}{Token policy flags (`include_unk`,
+#'       `include_cls_sep`).}
+#'     \item{`history`}{List of per-epoch training losses.}
+#'     \item{`device`}{String identifying the compute device used
+#'       (e.g. `"cpu"` or `"cuda:0"`).}
+#'   }
 #' @export
 #' @examples
 #' \dontrun{
-#' events <- data.frame(
-#'   patient_id = c(1L,1L,1L, 2L,2L,2L),
-#'   event  = c("HYPERTENSION","STATIN","T2D", "T2D","METFORMIN","HYPERTENSION"),
-#'   age    = c(50, 50.5, 52,  45, 45.3, 47.5)
+#' # ---- Pre-training on the 10-patient population from the Getting Started
+#' #      vignette.  Patients 1-3 have CVD in their history so the vocabulary
+#' #      includes CVD — required for CVD fine-tuning later.
+#' events_pop <- data.frame(
+#'   patient_id = c(rep(1,4), rep(2,6), rep(3,6), rep(4,4), rep(5,6),
+#'                  rep(6,4), rep(7,4), rep(8,4), rep(9,6), rep(10,4)),
+#'   event = c(
+#'     "HYPERTENSION","STATIN","BP_CHECK","CVD",
+#'     "HYPERTENSION","BP_CHECK","T2D","METFORMIN","HYPERTENSION","CVD",
+#'     "HYPERTENSION","BP_CHECK","STATIN","T2D","BP_CHECK","CVD",
+#'     "HYPERTENSION","STATIN","T2D","METFORMIN",
+#'     "HYPERTENSION","BP_CHECK","T2D","HBA1C","METFORMIN","STATIN",
+#'     "HYPERTENSION","AMLODIPINE","BP_CHECK","STATIN",
+#'     "STATIN","T2D","HBA1C","METFORMIN",
+#'     "HYPERTENSION","BP_CHECK","STATIN","T2D",
+#'     "HYPERTENSION","BP_CHECK","T2D","METFORMIN","HBA1C","STATIN",
+#'     "STATIN","BP_CHECK","HYPERTENSION","T2D"
+#'   ),
+#'   age = c(
+#'     55.0, 55.5, 56.2, 58.0,
+#'     44.0, 45.5, 48.0, 48.3, 50.5, 52.0,
+#'     58.0, 59.5, 62.0, 63.5, 64.0, 65.5,
+#'     45.0, 45.5, 47.0, 48.3,
+#'     48.0, 49.0, 51.0, 52.0, 53.0, 54.5,
+#'     60.0, 61.0, 62.3, 63.0,
+#'     40.0, 42.0, 43.5, 44.8,
+#'     58.0, 59.2, 60.0, 62.0,
+#'     46.0, 47.5, 50.0, 52.0, 52.5, 54.0,
+#'     44.0, 46.5, 47.0, 48.5
+#'   ),
+#'   value = c(
+#'     NA,  NA,  148, NA,
+#'     NA,  145, NA,  NA,  NA,  NA,
+#'     NA,  158, NA,  NA,  162, NA,
+#'     NA,  NA,  NA,  NA,
+#'     NA,  152, NA,  68,  NA,  NA,
+#'     NA,  NA,  155, NA,
+#'     NA,  NA,  74,  NA,
+#'     NA,  145, NA,  NA,
+#'     NA,  138, NA,  NA,  71,  NA,
+#'     NA,  138, NA,  NA
+#'   )
 #' )
-#' static <- data.frame(patient_id=c(1L,2L), sex=c("M","F"), imd=c(3L,1L))
-#' cfg    <- survivehr_config(block_size=32, n_layer=2, n_head=2, n_embd=64, epochs=1)
-#' pt     <- survivehr_pretrain(events, static, cfg)
-#' pt$event_vocab  # <PAD>=0, <UNK>=1, HYPERTENSION=2, ...
+#' static_pop <- data.frame(
+#'   patient_id    = 1:10,
+#'   SEX           = c("M","F","M","F","M","F","M","F","M","F"),
+#'   ETHNICITY     = c("White","Asian","White","Black","White",
+#'                     "Asian","White","White","Black","White"),
+#'   IMD           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
+#'   YEAR_OF_BIRTH = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
+#' )
+#' # 5-year prediction window; ages are in years
+#' cfg <- survivehr_config(
+#'   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
+#'   epochs = 10, batch_size = 4, time_scale = 5.0
+#' )
+#' pt <- survivehr_pretrain(events_pop, static_pop, cfg)
+#' # Vocabulary is frequency-ordered: most-common events get the smallest IDs
+#' # HYPERTENSION=10, BP_CHECK=9, STATIN=9, T2D=8, METFORMIN=5, CVD=3, HBA1C=3, AMLODIPINE=1
+#' pt$event_vocab
 #' }
 survivehr_pretrain <- function(events,
                                static_covariates = NULL,
@@ -37,36 +119,113 @@ survivehr_pretrain <- function(events,
   )
 }
 
-#' Fine-tune SurvivEHR from R data frames
+#' Fine-tune the RSurvivEHR backbone on labelled outcomes
 #'
-#' @param events data.frame with columns patient_id, event, age, optional value.
-#' @param targets data.frame with columns patient_id, target_event, target_age, optional target_value.
-#' @param outcomes character vector of outcomes for the fine-tuned head.
-#' @param risk_model "competing-risk" or "single-risk".
-#' @param static_covariates optional data.frame with patient_id + numeric columns.
-#' @param config list from `survivehr_config()`.
-#' @param pretrained_model optional model handle from `survivehr_pretrain()`.
-#' @param event_vocab optional named integer map to keep fixed tokenization.
-#' @return A named list (fine-tuned model bundle) with an additional `device`
-#'   field (e.g. `"cpu"` or `"cuda:0"`). Pass to `survivehr_predict()`
-#'   or `survivehr_save_model()`.
+#' Attaches a fresh outcome-level survival head on top of the pre-trained
+#' backbone and fine-tunes the combined model on a labelled cohort.  Two
+#' head types are supported:
+#' \itemize{
+#'   \item **`"competing-risk"`** — models two or more outcomes that compete
+#'     (the first to occur prevents the others from being observed).  Supply
+#'     all outcome codes in `outcomes`.
+#'   \item **`"single-risk"`** — models a single endpoint; patients without
+#'     the outcome are treated as right-censored.
+#' }
+#'
+#' To avoid data leakage, the `events` frame passed here must:
+#' 1. Have all outcome event codes **removed** (they are supplied only via
+#'    `targets`).
+#' 2. Contain only events that occurred **before** each patient's
+#'    `target_age` (events after the outcome would not be available at
+#'    prediction time).
+#'
+#' @param events A `data.frame` of context events (outcome codes and
+#'   post-outcome rows removed) with columns `patient_id`, `event`, `age`,
+#'   and optionally `value`.
+#' @param targets A `data.frame` with columns `patient_id`, `target_event`,
+#'   and `target_age` labelling the observed outcome (cases) or last
+#'   non-outcome event (censored patients).  Build with
+#'   `survivehr_validate_targets()`.
+#' @param outcomes Character vector of outcome event codes that the
+#'   fine-tuned head predicts.  Must match the codes used in `targets`.
+#' @param risk_model `"competing-risk"` (default) or `"single-risk"`.
+#'   Controls the architecture of the outcome-level head — independent of
+#'   the `surv_layer` used during pre-training.
+#' @param static_covariates An optional `data.frame` with the **same
+#'   columns** as those used at pre-training time.  Pass `NULL` to omit.
+#' @param config A named list from `survivehr_config()`.  `time_scale` is
+#'   inherited from the pre-trained bundle when `pretrained_model` is
+#'   supplied — no need to set it here.
+#' @param pretrained_model Model bundle returned by `survivehr_pretrain()`
+#'   or `survivehr_load_model()`.  When supplied, the vocabulary, weights,
+#'   and `time_scale` are inherited from the bundle.
+#' @param event_vocab An optional named integer vector overriding the
+#'   vocabulary.  Rarely needed; prefer supplying `pretrained_model`.
+#' @return A named list (fine-tuned model bundle) with the same structure
+#'   as the pre-trained bundle plus fine-tune-specific fields.  Pass to
+#'   `survivehr_predict()` or `survivehr_save_model()`.
 #' @export
 #' @examples
 #' \dontrun{
-#' # Using events/static/cfg/pt from survivehr_pretrain() example above
-#' targets <- data.frame(
-#'   patient_id   = 1L,
-#'   target_event = "CVD",
-#'   target_age   = 54.0
+#' # Uses events_pop / static_pop / cfg / pt from survivehr_pretrain() example.
+#' ft_static <- static_pop[static_pop$patient_id %in% 1:6, ]
+#'
+#' # ---- Competing-risk: CVD vs T2D (patients 1-6) ---------------------------
+#' targets_cr <- data.frame(
+#'   patient_id   = c(1L,    2L,    3L,    4L,    5L,    6L),
+#'   target_event = c("CVD", "T2D", "T2D", "T2D", "T2D", "STATIN"),
+#'   target_age   = c(58.0,  48.0,  63.5,  47.0,  51.0,  63.0)
 #' )
-#' ft <- survivehr_finetune(
-#'   events, targets,
-#'   outcomes     = "CVD",
-#'   risk_model   = "single-risk",
-#'   static_covariates = static,
-#'   config       = cfg,
-#'   pretrained_model  = pt
+#' survivehr_validate_targets(targets_cr)
+#'
+#' # Remove both outcomes; keep only events before target_age
+#' ft_events_cr <- events_pop[events_pop$patient_id %in% 1:6 &
+#'                               !events_pop$event %in% c("CVD","T2D"), ]
+#' ft_events_cr <- merge(ft_events_cr,
+#'                       targets_cr[, c("patient_id","target_age")],
+#'                       by = "patient_id")
+#' ft_events_cr <- ft_events_cr[ft_events_cr$age < ft_events_cr$target_age,
+#'                               c("patient_id","event","age","value")]
+#'
+#' cfg_cr <- survivehr_config(
+#'   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
+#'   epochs = 10, batch_size = 4, surv_layer = "competing-risk"
+#'   # time_scale inherited automatically from the pretrained bundle
 #' )
+#' ft_cr <- survivehr_finetune(
+#'   events = ft_events_cr, targets = targets_cr,
+#'   outcomes = c("CVD","T2D"), risk_model = "competing-risk",
+#'   static_covariates = ft_static, config = cfg_cr, pretrained_model = pt
+#' )
+#' cat("CR loss:", unlist(ft_cr$history), "\n")
+#'
+#' # ---- Single-risk: CVD only (patients 1-6) --------------------------------
+#' targets_sr <- data.frame(
+#'   patient_id   = c(1L,    2L,    3L,    4L,          5L,       6L),
+#'   target_event = c("CVD", "CVD", "CVD", "METFORMIN", "STATIN", "STATIN"),
+#'   target_age   = c(58.0,  52.0,  65.5,  48.3,         54.5,     63.0)
+#' )
+#' survivehr_validate_targets(targets_sr)
+#'
+#' # Remove CVD only; keep only events before target_age
+#' ft_events_sr <- events_pop[events_pop$patient_id %in% 1:6 &
+#'                               events_pop$event != "CVD", ]
+#' ft_events_sr <- merge(ft_events_sr,
+#'                       targets_sr[, c("patient_id","target_age")],
+#'                       by = "patient_id")
+#' ft_events_sr <- ft_events_sr[ft_events_sr$age < ft_events_sr$target_age,
+#'                               c("patient_id","event","age","value")]
+#'
+#' cfg_sr <- survivehr_config(
+#'   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
+#'   epochs = 10, batch_size = 4, surv_layer = "competing-risk"
+#' )
+#' ft_sr <- survivehr_finetune(
+#'   events = ft_events_sr, targets = targets_sr,
+#'   outcomes = "CVD", risk_model = "single-risk",
+#'   static_covariates = ft_static, config = cfg_sr, pretrained_model = pt
+#' )
+#' cat("SR loss:", unlist(ft_sr$history), "\n")
 #' }
 survivehr_finetune <- function(events,
                                targets,
@@ -96,18 +255,57 @@ survivehr_finetune <- function(events,
   )
 }
 
-#' Predict next events with SurvivEHR
+#' Predict cumulative incidence with a fine-tuned RSurvivEHR model
 #'
-#' @param model_bundle model object returned by pretrain/fine-tune.
-#' @param events data.frame with columns patient_id, event, age, optional value.
-#' @param static_covariates optional data.frame with patient_id + numeric columns.
-#' @param max_new_tokens number of autoregressive steps.
-#' @return `data.frame` with columns `patient_id`, `event`, `age`, `value`.
+#' Runs forward inference on new event sequences using a fine-tuned model
+#' bundle.  The prediction window length and age normalisation divisor
+#' (`time_scale`) are read automatically from the bundle — no need to
+#' supply them at inference time.
+#'
+#' The `events` frame should have the outcome event codes removed (same
+#' as the context filtering applied at fine-tune time) to ensure
+#' leakage-free predictions.
+#'
+#' @param model_bundle A model bundle returned by `survivehr_finetune()` or
+#'   `survivehr_load_model()`.
+#' @param events data.frame with columns `patient_id`, `event`, `age`,
+#'   optional `value`.  Should **not** contain the outcome event (leakage-free).
+#' @param static_covariates optional data.frame with `patient_id` and the
+#'   same covariate columns used at training time.
+#' @param max_new_tokens number of autoregressive steps (pretrain models only;
+#'   ignored for fine-tuned models).
+#' @return For a **fine-tuned** model, a `data.frame` with columns:
+#'   \describe{
+#'     \item{`patient_id`}{Patient identifier.}
+#'     \item{`{outcome}_cdf_last`}{Cumulative incidence of `outcome` at the
+#'       end of the prediction window.  The window spans
+#'       \code{[0, time_scale]} in the same units as `age`
+#'       (e.g. 0–5 years when `time_scale = 5.0`).  `time_scale` is stored
+#'       in the model bundle and used automatically — no need to supply it at
+#'       prediction time.}
+#'     \item{`{outcome}_auc`}{Area under the CDF curve integrated from 0 to
+#'       `time_scale`.  Interpretable as the average cumulative risk over the
+#'       prediction window.  Values closer to 1 indicate higher overall risk;
+#'       values closer to 0 indicate lower risk.}
+#'   }
+#'   For a **pretrain** model, a `data.frame` with columns
+#'   `patient_id`, `generated_token`, `generated_event`, `generated_age`,
+#'   `generated_value`.
 #' @export
 #' @examples
 #' \dontrun{
-#' preds <- survivehr_predict(ft, events, static)
-#' preds
+#' # ---- Prediction using ft / events_pop / static_pop from examples above -----
+#' # Remove the outcome event from prediction context (leakage-free)
+#' pred_events <- events_pop[events_pop$event != "CVD", ]
+#'
+#' preds <- survivehr_predict(ft, pred_events, static_pop)
+#' print(preds)
+#' # Columns: patient_id, CVD_cdf_last, CVD_auc
+#' #
+#' # CVD_cdf_last : probability of CVD within the next 5 years (time_scale = 5.0,
+#' #                stored in the model bundle — no need to set it at predict time)
+#' # CVD_auc      : average cumulative CVD risk over that 5-year window;
+#' #                higher = greater overall risk
 #' }
 survivehr_predict <- function(model_bundle,
                               events,
@@ -127,10 +325,15 @@ survivehr_predict <- function(model_bundle,
   reticulate::py_to_r(out)
 }
 
-#' Save a SurvivEHR model bundle
+#' Save an RSurvivEHR model bundle to disk
 #'
-#' @param model_bundle object returned by training functions.
-#' @param path file path ending in `.pt`.
+#' Serialises a model bundle (returned by `survivehr_pretrain()` or
+#' `survivehr_finetune()`) to a `.pt` file.  The bundle includes the
+#' model weights, vocabulary, static column schema, `time_scale`, token
+#' policy, and training history.  Reload with `survivehr_load_model()`.
+#'
+#' @param model_bundle A model bundle returned by a training function.
+#' @param path File path for the output file.  Should end in `.pt`.
 #' @return Invisibly returns `path`.
 #' @export
 #' @examples
@@ -146,11 +349,18 @@ survivehr_save_model <- function(model_bundle, path) {
   invisible(path)
 }
 
-#' Load a SurvivEHR model bundle
+#' Load an RSurvivEHR model bundle from disk
 #'
-#' @param path file path created by `survivehr_save_model()`.
-#' @return Named list (model bundle) identical in structure to the original
-#'   bundle returned by `survivehr_finetune()`.
+#' Restores a model bundle previously saved with `survivehr_save_model()`.
+#' The returned object is identical in structure to the original bundle and
+#' can be passed directly to `survivehr_predict()` or used as
+#' `pretrained_model` in a further `survivehr_finetune()` call.
+#'
+#' @param path File path to a `.pt` bundle created by
+#'   `survivehr_save_model()`.
+#' @return A named list (model bundle) with elements `model`,
+#'   `event_vocab`, `inv_vocab`, `config`, `time_scale`, `token_policy`,
+#'   `history`, and `device`.
 #' @export
 #' @examples
 #' \dontrun{

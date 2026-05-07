@@ -2,20 +2,23 @@
 % Please edit documentation in R/train.R
 \name{survivehr_save_model}
 \alias{survivehr_save_model}
-\title{Save a SurvivEHR model bundle}
+\title{Save an RSurvivEHR model bundle to disk}
 \usage{
 survivehr_save_model(model_bundle, path)
 }
 \arguments{
-\item{model_bundle}{object returned by training functions.}
+\item{model_bundle}{A model bundle returned by a training function.}
 
-\item{path}{file path ending in \code{.pt}.}
+\item{path}{File path for the output file.  Should end in \code{.pt}.}
 }
 \value{
 Invisibly returns \code{path}.
 }
 \description{
-Save a SurvivEHR model bundle
+Serialises a model bundle (returned by \code{survivehr_pretrain()} or
+\code{survivehr_finetune()}) to a \code{.pt} file.  The bundle includes the
+model weights, vocabulary, static column schema, \code{time_scale}, token
+policy, and training history.  Reload with \code{survivehr_load_model()}.
 }
 \examples{
 \dontrun{

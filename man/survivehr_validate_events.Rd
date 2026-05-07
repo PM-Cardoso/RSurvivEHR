@@ -2,19 +2,35 @@
 % Please edit documentation in R/validate.R
 \name{survivehr_validate_events}
 \alias{survivehr_validate_events}
-\title{Validate events schema for SurvivEHR}
+\title{Validate the events data frame for RSurvivEHR}
 \usage{
 survivehr_validate_events(events)
 }
 \arguments{
-\item{events}{data.frame with columns \code{patient_id}, \code{event}, \code{age} (or FastEHR aliases
-\code{PATIENT_ID}, \code{EVENT}, \code{DAYS_SINCE_BIRTH}), optional \code{value}/\code{VALUE}.}
+\item{events}{A \code{data.frame} with columns:
+\describe{
+\item{\code{patient_id}}{Patient identifier (numeric or character).}
+\item{\code{event}}{Clinical event code (character).}
+\item{\code{age}}{Patient age at the event in consistent units (numeric,
+non-negative, time-ordered within patient).  The uppercase alias
+\code{DAYS_SINCE_BIRTH} is also accepted.}
+\item{\code{value}}{(Optional) Continuous measurement recorded at the
+event (e.g. blood pressure or HbA1c).  \code{NA} for discrete events.}
+}
+Uppercase column-name aliases \code{PATIENT_ID} and \code{EVENT} are also
+accepted for compatibility.}
 }
 \value{
-Invisibly returns TRUE.
+Invisibly returns \code{TRUE}.  Prints a confirmation message on
+success.
 }
 \description{
-Validate events schema for SurvivEHR
+Checks that the events data frame supplied to
+\code{survivehr_pretrain()}, \code{survivehr_finetune()}, or \code{survivehr_predict()}
+is correctly formatted before any Python call is made, giving an
+informative R error instead of a cryptic Python traceback.  Specifically,
+it verifies that the required columns are present, that ages are numeric
+and non-negative, and that rows are time-ordered within each patient.
 }
 \examples{
 events <- data.frame(

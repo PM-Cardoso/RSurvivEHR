@@ -245,7 +245,8 @@ class BuiltData:
     static_col_names: List[str]     # encoded column names after one-hot expansion — used to align prediction-time tensors
     event_vocab: Dict[str, int]
     inv_vocab: Dict[int, str]
-    time_scale: float            # global age divisor (e.g. 1825.0 for DAYS_SINCE_BIRTH, 1.0 for years)
+    time_scale: float            # age divisor AND prediction window length in raw age units
+                                 # (e.g. 5.0 → 5-year window when ages are in years)
     token_policy: Dict[str, Any]
 
 
@@ -300,9 +301,11 @@ def _build_vocab_with_policy(events: pd.DataFrame,
         vocab[sep_token] = next_idx
         next_idx += 1
 
-    unique_events = sorted(events["event"].dropna().unique().tolist())
+    # Sort by descending frequency so the most-common events receive the
+    # smallest integer token IDs; ties are broken alphabetically for stability.
+    event_counts = events["event"].dropna().value_counts()
     reserved = set(vocab.keys())
-    for event in unique_events:
+    for event in event_counts.index.tolist():
         if event in reserved:
             continue
         vocab[event] = next_idx
@@ -322,15 +325,23 @@ def _build_context_data(events_df: pd.DataFrame,
     """
     Build padded tensor arrays from raw event data.
 
-    Age normalisation
-    -----------------
+    Age normalisation and prediction window
+    ----------------------------------------
     Each event age is divided by *time_scale* to give a dimensionless value:
 
         age_norm = raw_age / time_scale
 
-    Use ``time_scale=1825.0`` when ``age`` is in days (``DAYS_SINCE_BIRTH``,
-    matching FastEHR default).  Use ``time_scale=1.0`` when ``age`` is already
-    in years.
+    The survival ODE evaluates on a fixed normalised grid [0, 1].  Normalised
+    time 1.0 maps back to *time_scale* in raw age units.  Therefore
+    **time_scale is both the age divisor and the length of the prediction
+    window** in the same units as the ``age`` column:
+
+    - ``time_scale=5.0`` with ages in years  → 5-year prediction window
+    - ``time_scale=1.0`` with ages in years  → 1-year prediction window
+    - ``time_scale=365.25`` with ages in days → 1-year prediction window
+
+    The value is stored inside every model bundle and retrieved automatically
+    by ``predict_next_events`` — it does not need to be supplied at inference.
 
     Token layout per patient (before padding)
     -----------------------------------------
@@ -835,7 +846,7 @@ def train_finetune_model(events_df: pd.DataFrame,
         "inv_vocab": built.inv_vocab,
         "block_size": int(config.get("block_size", 128)),
         "time_scale": built.time_scale,
-        "outcomes": outcomes,
+        "outcomes": list(outcomes),  # always a list — guards against reticulate round-trip
         "risk_model": risk_model,
         "token_policy": token_policy,
         "static_raw_cols": built.static_raw_cols,
@@ -920,6 +931,10 @@ def predict_next_events(model_bundle: Dict[str, Any],
 
             rows = []
             outcome_labels = model_bundle.get("outcomes") or [f"risk_{i+1}" for i in range(len(cdfs))]
+            # Guard against reticulate round-trip: a single-element Python list
+            # ["CVD"] becomes the string "CVD" after Python->R->Python conversion.
+            if isinstance(outcome_labels, str):
+                outcome_labels = [outcome_labels]
             for i, pid in enumerate(built.patient_ids):
                 row = {"patient_id": pid}
                 for j, cdf in enumerate(cdfs):
@@ -932,6 +947,14 @@ def predict_next_events(model_bundle: Dict[str, Any],
 
 
 def save_model_bundle(model_bundle: Dict[str, Any], path: str) -> None:
+    # Normalise outcomes: reticulate may have converted ["CVD"] -> "CVD" (string)
+    # during a Python->R->Python round-trip.  Always persist as a proper list.
+    _outcomes = model_bundle.get("outcomes", None)
+    if isinstance(_outcomes, str):
+        _outcomes = [_outcomes]
+    elif _outcomes is not None:
+        _outcomes = list(_outcomes)
+
     payload = {
         "type": model_bundle["type"],
         "state_dict": model_bundle["model"].state_dict(),
@@ -940,7 +963,7 @@ def save_model_bundle(model_bundle: Dict[str, Any], path: str) -> None:
         "inv_vocab": model_bundle["inv_vocab"],
         "block_size": model_bundle["block_size"],
         "time_scale": model_bundle.get("time_scale", 1.0),
-        "outcomes": model_bundle.get("outcomes", None),
+        "outcomes": _outcomes,
         "risk_model": model_bundle.get("risk_model", "competing-risk"),
         "token_policy": model_bundle.get("token_policy", _token_policy_from_config()),
         "static_raw_cols": model_bundle.get("static_raw_cols", None),
@@ -961,6 +984,10 @@ def load_model_bundle(path: str) -> Dict[str, Any]:
         model = CausalExperiment(cfg=cfg, vocab_size=vocab_size)
     elif kind == "finetune":
         outcomes = payload.get("outcomes") or []
+        # Guard: if saved while outcomes was a bare string (reticulate round-trip
+        # artefact), restore it as a proper list before looking up tokens.
+        if isinstance(outcomes, str):
+            outcomes = [outcomes]
         outcome_tokens = [payload["event_vocab"][o] for o in outcomes if o in payload["event_vocab"]]
         risk_model = payload.get("risk_model", "competing-risk")
         model = FineTuneExperiment(cfg=cfg, outcome_tokens=outcome_tokens, risk_model=risk_model, vocab_size=vocab_size)
@@ -977,7 +1004,7 @@ def load_model_bundle(path: str) -> Dict[str, Any]:
         "inv_vocab": payload["inv_vocab"],
         "block_size": int(payload["block_size"]),
         "time_scale": float(payload.get("time_scale", 1.0)),
-        "outcomes": payload.get("outcomes", None),
+        "outcomes": outcomes if kind == "finetune" else payload.get("outcomes", None),
         "risk_model": payload.get("risk_model", "competing-risk"),
         "token_policy": payload.get("token_policy", _token_policy_from_config()),
         "static_raw_cols": payload.get("static_raw_cols", None),

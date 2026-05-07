@@ -39,6 +39,7 @@ def main() -> None:
         "batch_size": 2,
         "learning_rate": 1e-3,
         "surv_layer": "competing-risk",
+        "time_scale": 5.0,  # 5-year prediction window (ages in years)
     }
 
     pre = train_pretrain_model(events, static_df=static_df, config=config)

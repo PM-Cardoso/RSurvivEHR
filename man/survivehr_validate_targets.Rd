@@ -2,20 +2,33 @@
 % Please edit documentation in R/validate.R
 \name{survivehr_validate_targets}
 \alias{survivehr_validate_targets}
-\title{Validate fine-tune targets schema for SurvivEHR}
+\title{Validate the fine-tune targets data frame for RSurvivEHR}
 \usage{
 survivehr_validate_targets(targets)
 }
 \arguments{
-\item{targets}{data.frame with columns \code{patient_id}, \code{target_event}, \code{target_age}
-or FastEHR aliases (\code{PATIENT_ID}, \code{EVENT}, \code{DAYS_SINCE_BIRTH}). Optional
-\code{target_value} / \code{VALUE}.}
+\item{targets}{A \code{data.frame} with columns:
+\describe{
+\item{\code{patient_id}}{Patient identifier matching the events frame.}
+\item{\code{target_event}}{Event code for the labelled outcome (cases) or
+the last observed non-outcome event (censored).}
+\item{\code{target_age}}{Age at the target event.  Must be numeric and
+non-negative.}
+\item{\code{target_value}}{(Optional) Continuous measurement at the
+target event.  \code{NA} for discrete events.}
+}
+Uppercase column-name aliases \code{PATIENT_ID}, \code{EVENT}, and
+\code{DAYS_SINCE_BIRTH} are also accepted for compatibility.}
 }
 \value{
-Invisibly returns TRUE.
+Invisibly returns \code{TRUE}.  Prints a confirmation message listing
+the number of labelled patients and all observed outcome values.
 }
 \description{
-Validate fine-tune targets schema for SurvivEHR
+Checks that the targets data frame supplied to \code{survivehr_finetune()}
+is correctly formatted.  Each row labels one patient: cases supply the
+observed outcome event and its age; censored patients supply their last
+observed non-outcome event and its age.
 }
 \examples{
 targets <- data.frame(

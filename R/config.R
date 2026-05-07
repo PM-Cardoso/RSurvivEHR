@@ -1,4 +1,10 @@
-#' Build default SurvivEHR configuration
+#' Build an RSurvivEHR configuration list
+#'
+#' Returns a named list of hyperparameters consumed by `survivehr_pretrain()`,
+#' `survivehr_finetune()`, and `survivehr_predict()`.  All parameters have
+#' sensible defaults suitable for small datasets; see the
+#' *Model architecture* vignette for recommended values for larger cohorts
+#' and the official Gadd et al. (2025) hyperparameter table.
 #'
 #' @param block_size Sequence length after padding/truncation.
 #' @param n_layer Number of transformer blocks.
@@ -14,21 +20,29 @@
 #' @param device "auto", "cpu", or "cuda".
 #' @param include_unk Whether to reserve and use `<UNK>` for unseen events.
 #' @param include_cls_sep Whether to add `<CLS>` and `<SEP>` around each sequence.
-#' @param time_scale Divisor applied to every raw age before it enters the model.
-#'   Use `1.0` (default) when ages are in years.
-#'   Use `1825.0` when ages are in days (`DAYS_SINCE_BIRTH`, matching FastEHR default).
-#'   Must be consistent between pretrain, fine-tune, and prediction.
+#' @param time_scale Controls both the age normalisation and the length of the
+#'   prediction window.  Every raw age is divided by this value before entering
+#'   the model; the survival ODE evaluates over a normalised \code{[0, 1]} grid
+#'   that maps back to \code{[0, time_scale]} in your original age units.
+#'   \itemize{
+#'     \item Use \code{5.0} for a 5-year prediction window with ages in years (recommended).
+#'     \item Use \code{1.0} for a 1-year window with ages in years.
+#'     \item Use \code{365.25} for a 1-year window with ages in days.
+#'     \item Use \code{1826.25} for a 5-year window with ages in days.
+#'   }
+#'   Stored automatically in every model bundle; no need to supply at prediction time.
+#'   Must be the same across pretrain, fine-tune, and prediction.
 #'
 #' @return Named list used by training functions.
 #' @export
 #' @examples
-#' # Minimal config for a quick CPU run
+#' # Minimal config for a 5-year prediction window (ages in years)
 #' cfg <- survivehr_config(
 #'   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
-#'   epochs = 1, batch_size = 4
+#'   epochs = 1, batch_size = 4, time_scale = 5.0
 #' )
 #' cfg$surv_layer   # "competing-risk"
-#' cfg$time_scale   # 1.0
+#' cfg$time_scale   # 5.0
 survivehr_config <- function(
   block_size = 128,
   n_layer = 4,

@@ -1,16 +1,18 @@
 Package: RSurvivEHR
 Type: Package
 Title: Survival Analysis on Electronic Health Records via SurvivEHR
-Version: 0.7.5
+Version: 0.7.8
 Authors@R: person(given = "Pedro", family = "Cardoso", role = c("aut", "cre"),
     email = "p.cardoso@exeter.ac.uk", comment = c(ORCID = "0000-0000-0000-0000"))
 Description: An R interface to SurvivEHR, a transformer-based survival model
     for longitudinal Electronic Health Record (EHR) data. Build a vocabulary
     from clinical event sequences, pre-train a competing-risk or single-risk
-    survival model, fine-tune on labelled outcomes, and predict time-to-event
-    probabilities, all from plain R data frames. The Python backend (vendored
-    inside the package) is managed automatically via 'reticulate'; no
-    FastEHR installation is required.
+    survival backbone, fine-tune on labelled outcomes (single-risk or
+    competing-risk), and predict cumulative-incidence curves — all from plain
+    R data frames. Supports biomarker values alongside discrete events,
+    leakage-free cohort construction helpers, and frequency-ordered
+    vocabularies. The Python backend is vendored inside the package and
+    managed automatically via 'reticulate'.
 License: GPL-3
 Encoding: UTF-8
 LazyData: false

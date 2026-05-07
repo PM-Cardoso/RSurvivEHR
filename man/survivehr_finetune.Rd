@@ -2,7 +2,7 @@
 % Please edit documentation in R/train.R
 \name{survivehr_finetune}
 \alias{survivehr_finetune}
-\title{Fine-tune SurvivEHR from R data frames}
+\title{Fine-tune the RSurvivEHR backbone on labelled outcomes}
 \usage{
 survivehr_finetune(
   events,
@@ -16,44 +16,123 @@ survivehr_finetune(
 )
 }
 \arguments{
-\item{events}{data.frame with columns patient_id, event, age, optional value.}
+\item{events}{A \code{data.frame} of context events (outcome codes and
+post-outcome rows removed) with columns \code{patient_id}, \code{event}, \code{age},
+and optionally \code{value}.}
 
-\item{targets}{data.frame with columns patient_id, target_event, target_age, optional target_value.}
+\item{targets}{A \code{data.frame} with columns \code{patient_id}, \code{target_event},
+and \code{target_age} labelling the observed outcome (cases) or last
+non-outcome event (censored patients).  Build with
+\code{survivehr_validate_targets()}.}
 
-\item{outcomes}{character vector of outcomes for the fine-tuned head.}
+\item{outcomes}{Character vector of outcome event codes that the
+fine-tuned head predicts.  Must match the codes used in \code{targets}.}
 
-\item{risk_model}{"competing-risk" or "single-risk".}
+\item{risk_model}{\code{"competing-risk"} (default) or \code{"single-risk"}.
+Controls the architecture of the outcome-level head — independent of
+the \code{surv_layer} used during pre-training.}
 
-\item{static_covariates}{optional data.frame with patient_id + numeric columns.}
+\item{static_covariates}{An optional \code{data.frame} with the \strong{same
+columns} as those used at pre-training time.  Pass \code{NULL} to omit.}
 
-\item{config}{list from \code{survivehr_config()}.}
+\item{config}{A named list from \code{survivehr_config()}.  \code{time_scale} is
+inherited from the pre-trained bundle when \code{pretrained_model} is
+supplied — no need to set it here.}
 
-\item{pretrained_model}{optional model handle from \code{survivehr_pretrain()}.}
+\item{pretrained_model}{Model bundle returned by \code{survivehr_pretrain()}
+or \code{survivehr_load_model()}.  When supplied, the vocabulary, weights,
+and \code{time_scale} are inherited from the bundle.}
 
-\item{event_vocab}{optional named integer map to keep fixed tokenization.}
+\item{event_vocab}{An optional named integer vector overriding the
+vocabulary.  Rarely needed; prefer supplying \code{pretrained_model}.}
 }
 \value{
-A named list (fine-tuned model bundle). Pass to \code{survivehr_predict()}
-or \code{survivehr_save_model()}.
+A named list (fine-tuned model bundle) with the same structure
+as the pre-trained bundle plus fine-tune-specific fields.  Pass to
+\code{survivehr_predict()} or \code{survivehr_save_model()}.
 }
 \description{
-Fine-tune SurvivEHR from R data frames
+Attaches a fresh outcome-level survival head on top of the pre-trained
+backbone and fine-tunes the combined model on a labelled cohort.  Two
+head types are supported:
+\itemize{
+\item \strong{\code{"competing-risk"}} — models two or more outcomes that compete
+(the first to occur prevents the others from being observed).  Supply
+all outcome codes in \code{outcomes}.
+\item \strong{\code{"single-risk"}} — models a single endpoint; patients without
+the outcome are treated as right-censored.
+}
+}
+\details{
+To avoid data leakage, the \code{events} frame passed here must:
+\enumerate{
+\item Have all outcome event codes \strong{removed} (they are supplied only via
+\code{targets}).
+\item Contain only events that occurred \strong{before} each patient's
+\code{target_age} (events after the outcome would not be available at
+prediction time).
+}
 }
 \examples{
 \dontrun{
-# Using events/static/cfg/pt from survivehr_pretrain() example above
-targets <- data.frame(
-  patient_id   = 1L,
-  target_event = "CVD",
-  target_age   = 54.0
+# Uses events_pop / static_pop / cfg / pt from survivehr_pretrain() example.
+ft_static <- static_pop[static_pop$patient_id \%in\% 1:6, ]
+
+# ---- Competing-risk: CVD vs T2D (patients 1-6) ---------------------------
+targets_cr <- data.frame(
+  patient_id   = c(1L,    2L,    3L,    4L,    5L,    6L),
+  target_event = c("CVD", "T2D", "T2D", "T2D", "T2D", "STATIN"),
+  target_age   = c(58.0,  48.0,  63.5,  47.0,  51.0,  63.0)
 )
-ft <- survivehr_finetune(
-  events, targets,
-  outcomes     = "CVD",
-  risk_model   = "single-risk",
-  static_covariates = static,
-  config       = cfg,
-  pretrained_model  = pt
+survivehr_validate_targets(targets_cr)
+
+# Remove both outcomes; keep only events before target_age
+ft_events_cr <- events_pop[events_pop$patient_id \%in\% 1:6 &
+                              !events_pop$event \%in\% c("CVD","T2D"), ]
+ft_events_cr <- merge(ft_events_cr,
+                      targets_cr[, c("patient_id","target_age")],
+                      by = "patient_id")
+ft_events_cr <- ft_events_cr[ft_events_cr$age < ft_events_cr$target_age,
+                              c("patient_id","event","age","value")]
+
+cfg_cr <- survivehr_config(
+  block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
+  epochs = 10, batch_size = 4, surv_layer = "competing-risk"
+  # time_scale inherited automatically from the pretrained bundle
 )
+ft_cr <- survivehr_finetune(
+  events = ft_events_cr, targets = targets_cr,
+  outcomes = c("CVD","T2D"), risk_model = "competing-risk",
+  static_covariates = ft_static, config = cfg_cr, pretrained_model = pt
+)
+cat("CR loss:", unlist(ft_cr$history), "\n")
+
+# ---- Single-risk: CVD only (patients 1-6) --------------------------------
+targets_sr <- data.frame(
+  patient_id   = c(1L,    2L,    3L,    4L,          5L,       6L),
+  target_event = c("CVD", "CVD", "CVD", "METFORMIN", "STATIN", "STATIN"),
+  target_age   = c(58.0,  52.0,  65.5,  48.3,         54.5,     63.0)
+)
+survivehr_validate_targets(targets_sr)
+
+# Remove CVD only; keep only events before target_age
+ft_events_sr <- events_pop[events_pop$patient_id \%in\% 1:6 &
+                              events_pop$event != "CVD", ]
+ft_events_sr <- merge(ft_events_sr,
+                      targets_sr[, c("patient_id","target_age")],
+                      by = "patient_id")
+ft_events_sr <- ft_events_sr[ft_events_sr$age < ft_events_sr$target_age,
+                              c("patient_id","event","age","value")]
+
+cfg_sr <- survivehr_config(
+  block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
+  epochs = 10, batch_size = 4, surv_layer = "competing-risk"
+)
+ft_sr <- survivehr_finetune(
+  events = ft_events_sr, targets = targets_sr,
+  outcomes = "CVD", risk_model = "single-risk",
+  static_covariates = ft_static, config = cfg_sr, pretrained_model = pt
+)
+cat("SR loss:", unlist(ft_sr$history), "\n")
 }
 }

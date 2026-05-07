@@ -2,7 +2,7 @@
 % Please edit documentation in R/config.R
 \name{survivehr_config}
 \alias{survivehr_config}
-\title{Build default SurvivEHR configuration}
+\title{Build an RSurvivEHR configuration list}
 \usage{
 survivehr_config(
   block_size = 128,
@@ -51,23 +51,35 @@ survivehr_config(
 
 \item{include_cls_sep}{Whether to add \verb{<CLS>} and \verb{<SEP>} around each sequence.}
 
-\item{time_scale}{Divisor applied to every raw age before it enters the model.
-Use \code{1.0} (default) when ages are in years.
-Use \code{1825.0} when ages are in days (\code{DAYS_SINCE_BIRTH}, matching FastEHR default).
-Must be consistent between pretrain, fine-tune, and prediction.}
+\item{time_scale}{Controls both the age normalisation and the length of the
+prediction window.  Every raw age is divided by this value before entering
+the model; the survival ODE evaluates over a normalised \code{[0, 1]} grid
+that maps back to \code{[0, time_scale]} in your original age units.
+\itemize{
+\item Use \code{5.0} for a 5-year prediction window with ages in years (recommended).
+\item Use \code{1.0} for a 1-year window with ages in years.
+\item Use \code{365.25} for a 1-year window with ages in days.
+\item Use \code{1826.25} for a 5-year window with ages in days.
+}
+Stored automatically in every model bundle; no need to supply at prediction time.
+Must be the same across pretrain, fine-tune, and prediction.}
 }
 \value{
 Named list used by training functions.
 }
 \description{
-Build default SurvivEHR configuration
+Returns a named list of hyperparameters consumed by \code{survivehr_pretrain()},
+\code{survivehr_finetune()}, and \code{survivehr_predict()}.  All parameters have
+sensible defaults suitable for small datasets; see the
+\emph{Model architecture} vignette for recommended values for larger cohorts
+and the official Gadd et al. (2025) hyperparameter table.
 }
 \examples{
-# Minimal config for a quick CPU run
+# Minimal config for a 5-year prediction window (ages in years)
 cfg <- survivehr_config(
   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
-  epochs = 1, batch_size = 4
+  epochs = 1, batch_size = 4, time_scale = 5.0
 )
 cfg$surv_layer   # "competing-risk"
-cfg$time_scale   # 1.0
+cfg$time_scale   # 5.0
 }

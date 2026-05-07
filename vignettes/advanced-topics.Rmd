@@ -26,7 +26,7 @@ Index  Token
   1    <UNK>   when include_unk = TRUE (default)
   2    <CLS>   when include_cls_sep = TRUE
   3    <SEP>   when include_cls_sep = TRUE
-  2+   clinical events, alphabetically sorted
+  2+   clinical events, ordered by frequency (most common first)
 ```
 
 `<PAD>` is always index 0 because SurvivEHR's `SplitDynamicEmbeddingLayer`
@@ -34,6 +34,33 @@ uses `padding_idx = 0` internally.
 
 At prediction time any event code not present in `event_vocab` is replaced
 by `<UNK>` (index 1), provided `include_unk = TRUE`.
+
+> **Pre-train only.** `include_unk` and `include_cls_sep` are fixed when the
+> vocabulary is built during `survivehr_pretrain()`.  The values stored in the
+> bundle are reused automatically at fine-tune and prediction time; any
+> `include_unk` / `include_cls_sep` values in a fine-tune config are ignored.
+
+---
+
+## `surv_layer` and `risk_model`
+
+`surv_layer` (in `survivehr_config()`) and `risk_model` (an argument to
+`survivehr_finetune()`) look similar but refer to **different survival heads**:
+
+| Parameter | Where | Controls |
+|---|---|---|
+| `surv_layer` | `survivehr_config()` | The **backbone time-to-next-event head**.  Pre-training is not just "predict which event comes next" — it also trains a survival ODE to predict *when* the next event occurs, using age as the time axis.  `surv_layer` frames this as competing-risk (one event can be next; all others compete) or single-risk (each token modelled independently 1-vs-all).  Active during **both** pre-training and fine-tuning; the backbone architecture must remain consistent. |
+| `risk_model` | `survivehr_finetune()` arg | The **outcome-level head** added on top of the backbone — predicts patient-level CIF curves for the specific labelled outcomes.  A brand-new, freshly initialised `nn.Module` that is never touched during pre-training and sits beside the backbone.  Entirely independent of `surv_layer`. |
+
+Because they control completely separate modules, **`surv_layer` and
+`risk_model` can be set differently without any conflict**.  For example,
+you can pretrain with `surv_layer = "competing-risk"` and then fine-tune
+with `risk_model = "single-risk"`, or vice versa.
+
+In practice, leave `surv_layer = "competing-risk"` (the default) unless you
+have a specific reason to change it, and use `risk_model` in
+`survivehr_finetune()` to choose `"competing-risk"` (multiple outcomes) or
+`"single-risk"` (one outcome).
 
 ---
 
@@ -43,13 +70,20 @@ All raw ages are divided by `time_scale` before entering the model:
 
 $$a_{\text{norm}} = \frac{a_{\text{raw}}}{\texttt{time\_scale}}$$
 
-The target time delta for fine-tuning is:
+**During pre-training**, this is the only role of `time_scale` — it controls
+how ages are scaled before being fed to the transformer.  There is no
+prediction window during pre-training.
+
+**During fine-tuning**, `time_scale` additionally defines the prediction
+window: the target time delta is normalised by the same divisor,
 
 $$\delta_{\text{norm}} = \frac{a_{\text{target}} - a_{\text{last context}}}{\texttt{time\_scale}}$$
 
-Use `time_scale = 1.0` (default) when ages are already in **years**.  
-Use `time_scale = 1825.0` when ages are in **days since birth**, matching
-FastEHR's `DAYS_SINCE_BIRTH` convention (1825 days ≈ 5 years).
+so the ODE integrates over $[0, 1]$ which maps to $[0, \texttt{time\_scale}]$
+raw years (or whatever unit your ages are in).
+
+Use `time_scale = 1.0` (default) when ages are in **years**.  
+Use `time_scale = 365.25` when ages are in **days** (e.g. 18 262 days ≈ 50 years).
 
 The `time_scale` is stored in the model bundle and automatically applied at
 fine-tune and predict time, so you only need to set it once in
@@ -67,14 +101,16 @@ Static features are encoded into a flat numeric vector per patient:
 | Fully numeric (int or float) | Passed through as-is |
 | Patient missing from `static_df` | All zeros |
 
-> **Column naming rule**: `patient_id` (or `PATIENT_ID`) is the only reserved
-> name in the static table.  All other column names are **user-defined** —
-> call them `SEX`, `imd`, `YearOfBirth`, or anything else.  The column names
-> become the basis for encoded feature names (e.g. `SEX` → `SEX_F`, `SEX_M`).
+> **Column naming rule**: `patient_id` (or the uppercase alias `PATIENT_ID`)
+> is the only reserved name in the static table.  All other column names are
+> **user-defined** — call them `SEX`, `imd`, `YearOfBirth`, or anything else.
+> The column names become the basis for encoded feature names
+> (e.g. `SEX` → `SEX_F`, `SEX_M`).
 > This is in contrast to the **events** and **targets** tables, which require
-> fixed column names (`patient_id`, `event`, `age`, `value`) or their FastEHR
-> UPPER_CASE aliases.  The only constraint for static columns is **consistency**:
-> the exact same names must be used at pretrain, fine-tune, and predict time.
+> fixed column names (`patient_id`, `event`, `age`, `value`) — see the
+> *Column name aliases* section below for accepted uppercase alternatives.
+> The only constraint for static columns is **consistency**: the exact same
+> names must be used at pretrain, fine-tune, and predict time.
 
 ```{r}
 static_covariates <- data.frame(
@@ -126,11 +162,11 @@ comparable.
 
 ---
 
-## FastEHR column aliases
+## Column name aliases
 
-All functions accept the uppercase column names used by FastEHR:
+All functions accept lowercase or uppercase column names:
 
-| RSurvivEHR name | FastEHR alias |
+| Standard name | Accepted alias |
 |---|---|
 | `patient_id` | `PATIENT_ID` |
 | `event` | `EVENT` |
@@ -139,97 +175,128 @@ All functions accept the uppercase column names used by FastEHR:
 | `target_event` | `TARGET_EVENT` / `EVENT` |
 | `target_age` | `TARGET_AGE` / `DAYS_SINCE_BIRTH` |
 
-When `DAYS_SINCE_BIRTH` is used, remember to set `time_scale = 1825.0` in
-`survivehr_config()`.
+The `DAYS_SINCE_BIRTH` alias exists for compatibility with datasets where ages
+are stored as days rather than years.  If you use it, set
+`time_scale = 365.25` in `survivehr_config()` so ages are normalised to
+year-scale before entering the model.
 
 ---
 
-## Full 6-patient worked example
+## Full worked example
 
-This section walks through a complete analysis on 6 synthetic patients.
+This section reproduces the complete pipeline from the Getting Started vignette
+in a single self-contained block, demonstrating every best practice:
+leakage-free context construction, targets defined before context filtering,
+and the competing-risk fine-tune on two outcomes.
 
 ```{r}
 library(RSurvivEHR)
 
-# ── 1. Data ─────────────────────────────────────────────────────────────────
-all_events <- data.frame(
-  patient_id = c(1,1,1,1,1,1,  2,2,2,2,2,  3,3,3,3,3,  4,4,4,4,4,  5,5,5,5,5,5,  6,6,6,6,6,6),
+# ── 1. Data (same population as the Getting Started vignette) ────────────────
+events_pop <- data.frame(
+  patient_id = c(rep(1,4), rep(2,6), rep(3,6), rep(4,4), rep(5,6),
+                 rep(6,4), rep(7,4), rep(8,4), rep(9,6), rep(10,4)),
   event = c(
-    "HYPERTENSION","STATIN","T2D","BP_CHECK","HBA1C","METFORMIN",
-    "T2D","METFORMIN","HBA1C","HYPERTENSION","STATIN",
-    "STATIN","T2D","METFORMIN","BP_CHECK","HBA1C",
-    "HYPERTENSION","AMLODIPINE","BP_CHECK","STATIN","T2D",
-    "T2D","STATIN","HBA1C","HYPERTENSION","METFORMIN","CVD",
-    "T2D","HYPERTENSION","STATIN","BMI","METFORMIN","DEATH"
+    "HYPERTENSION","STATIN","BP_CHECK","CVD",
+    "HYPERTENSION","BP_CHECK","T2D","METFORMIN","HYPERTENSION","CVD",
+    "HYPERTENSION","BP_CHECK","STATIN","T2D","BP_CHECK","CVD",
+    "HYPERTENSION","STATIN","T2D","METFORMIN",
+    "HYPERTENSION","BP_CHECK","T2D","HBA1C","METFORMIN","STATIN",
+    "HYPERTENSION","AMLODIPINE","BP_CHECK","STATIN",
+    "STATIN","T2D","HBA1C","METFORMIN",
+    "HYPERTENSION","BP_CHECK","STATIN","T2D",
+    "HYPERTENSION","BP_CHECK","T2D","METFORMIN","HBA1C","STATIN",
+    "STATIN","BP_CHECK","HYPERTENSION","T2D"
   ),
   age = c(
-    50.0, 50.5, 52.0, 52.1, 52.3, 52.5,
-    45.0, 45.3, 46.0, 47.5, 48.0,
-    58.0, 60.1, 60.4, 61.5, 62.0,
-    55.0, 55.4, 56.0, 57.2, 58.0,
-    48.0, 48.6, 49.0, 49.1, 50.5, 51.2,
-    60.0, 60.8, 62.5, 62.8, 63.0, 64.1
+    55.0, 55.5, 56.2, 58.0,
+    44.0, 45.5, 48.0, 48.3, 50.5, 52.0,
+    58.0, 59.5, 62.0, 63.5, 64.0, 65.5,
+    45.0, 45.5, 47.0, 48.3,
+    48.0, 49.0, 51.0, 52.0, 53.0, 54.5,
+    60.0, 61.0, 62.3, 63.0,
+    40.0, 42.0, 43.5, 44.8,
+    58.0, 59.2, 60.0, 62.0,
+    46.0, 47.5, 50.0, 52.0, 52.5, 54.0,
+    44.0, 46.5, 47.0, 48.5
   ),
   value = c(
-    NA,  NA,  NA,  152, 54,  NA,   # p1: BP_CHECK=152 mmHg, HBA1C=54 mmol/mol
-    NA,  NA,  61,  NA,  NA,        # p2: HBA1C=61 mmol/mol
-    NA,  NA,  NA,  145, 58,        # p3: BP_CHECK=145 mmHg, HBA1C=58 mmol/mol
-    NA,  NA,  168, NA,  NA,        # p4: BP_CHECK=168 mmHg (hypertensive)
-    NA,  NA,  67,  NA,  NA,  NA,   # p5: HBA1C=67 mmol/mol (poorly controlled)
-    NA,  NA,  NA,  32.1,NA,  NA    # p6: BMI=32.1 kg/m² (obese)
+    NA,  NA,  148, NA,
+    NA,  145, NA,  NA,  NA,  NA,
+    NA,  158, NA,  NA,  162, NA,
+    NA,  NA,  NA,  NA,
+    NA,  152, NA,  68,  NA,  NA,
+    NA,  NA,  155, NA,
+    NA,  NA,  74,  NA,
+    NA,  145, NA,  NA,
+    NA,  138, NA,  NA,  71,  NA,
+    NA,  138, NA,  NA
   )
 )
 
-static_covariates <- data.frame(
-  patient_id     = 1:6,
-  SEX            = c("M","F","M","F","M","F"),
-  ETHNICITY      = c("White","Asian","White","White","Black","White"),
-  SMOKING_STATUS = c("Never","Never","Ex","Never","Ex","Never"),
-  IMD            = c(3L, 1L, 5L, 2L, 4L, 3L),
-  YEAR_OF_BIRTH  = c(1965L,1972L,1955L,1960L,1968L,1958L)
+static_pop <- data.frame(
+  patient_id    = 1:10,
+  SEX           = c("M","F","M","F","M","F","M","F","M","F"),
+  ETHNICITY     = c("White","Asian","White","Black","White",
+                    "Asian","White","White","Black","White"),
+  IMD           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
+  YEAR_OF_BIRTH = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
 )
 
-# ── 2. Config ────────────────────────────────────────────────────────────────
+# ── 2. Config ─────────────────────────────────────────────────────────────────
+# time_scale = 5.0 → 5-year prediction window; stored in pretrained bundle
+# and inherited automatically at fine-tune and prediction time.
 cfg <- survivehr_config(
-  block_size = 32, n_layer = 2, n_head = 2, n_embd = 64,
-  epochs = 2, batch_size = 4,
+  block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
+  epochs = 10, batch_size = 4,
   surv_layer = "competing-risk",
-  time_scale = 1.0
+  time_scale = 5.0
 )
 
-# ── 3. Pre-train on all patients ─────────────────────────────────────────────
-pt <- survivehr_pretrain(all_events, static_covariates, cfg)
+# ── 3. Pre-train on all 10 patients ───────────────────────────────────────────
+pt <- survivehr_pretrain(events_pop, static_pop, cfg)
+# Vocabulary ordered by frequency (most common first):
+# <PAD>=0, <UNK>=1, HYPERTENSION=2, BP_CHECK=3, T2D=4, STATIN=5, ...
 pt$event_vocab
-# <PAD>=0, <UNK>=1, AMLODIPINE=2, BMI=3, BP_CHECK=4, CVD=5,
-# DEATH=6, HBA1C=7, HYPERTENSION=8, METFORMIN=9, STATIN=10, T2D=11
 
-# ── 4. Fine-tune on CVD / DEATH (patients 5 & 6) ────────────────────────────
-# Context = all events BEFORE the labelled outcome age (leakage-free)
-ft_events <- all_events[!all_events$event %in% c("CVD","DEATH"), ]
+survivehr_save_model(pt, "pretrain_backbone.pt")
 
+# ── 4. Fine-tune: competing-risk CVD vs T2D (patients 1–6) ───────────────────
+ft_static <- static_pop[static_pop$patient_id %in% 1:6, ]
+
+# Define targets FIRST — the outcome age sets the context cut-off
 targets <- data.frame(
-  patient_id   = c(5L, 6L),
-  target_event = c("CVD", "DEATH"),
-  target_age   = c(51.2, 64.1)
+  patient_id   = c(1L,    2L,    3L,    4L,    5L,    6L),
+  target_event = c("CVD", "T2D", "T2D", "T2D", "T2D", "STATIN"),
+  target_age   = c(58.0,  48.0,  63.5,  47.0,  51.0,  63.0)
 )
-# Patient 5: last context age = 50.5  → delta = (51.2 - 50.5) / 1.0 = 0.7
-# Patient 6: last context age = 63.0  → delta = (64.1 - 63.0) / 1.0 = 1.1
+# p1: CVD case.  p2–p5: T2D occurred first (CVD is the competing event for p2/p3).
+# p6: censored — neither CVD nor T2D observed.
+
+# Build context: remove both outcome codes AND events after the target age
+ft_events <- events_pop[events_pop$patient_id %in% 1:6 &
+                           !events_pop$event %in% c("CVD", "T2D"), ]
+ft_events <- merge(ft_events, targets[, c("patient_id", "target_age")], by = "patient_id")
+ft_events <- ft_events[ft_events$age < ft_events$target_age,
+                        c("patient_id", "event", "age", "value")]
 
 ft <- survivehr_finetune(
   events            = ft_events,
   targets           = targets,
-  outcomes          = c("CVD", "DEATH"),
+  outcomes          = c("CVD", "T2D"),   # two competing outcomes
   risk_model        = "competing-risk",
-  static_covariates = static_covariates,
+  static_covariates = ft_static,
   config            = cfg,
-  pretrained_model  = pt
+  pretrained_model  = pt   # vocabulary, time_scale, and weights all inherited
 )
 
-# ── 5. Predict on context patients ───────────────────────────────────────────
-preds <- survivehr_predict(ft, ft_events, static_covariates)
+# ── 5. Predict on the full cohort (outcome codes removed from context) ────────
+pred_events <- events_pop[!events_pop$event %in% c("CVD", "T2D"), ]
+preds <- survivehr_predict(ft, pred_events, static_pop)
+# Columns: patient_id, CVD_cdf_last, CVD_auc, T2D_cdf_last, T2D_auc
 preds
 
-# ── 6. Save / load round-trip ────────────────────────────────────────────────
+# ── 6. Save / load round-trip ─────────────────────────────────────────────────
 tmp <- tempfile(fileext = ".pt")
 survivehr_save_model(ft, tmp)
 ft2 <- survivehr_load_model(tmp)

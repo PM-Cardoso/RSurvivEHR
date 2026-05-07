@@ -2,7 +2,7 @@
 % Please edit documentation in R/train.R
 \name{survivehr_pretrain}
 \alias{survivehr_pretrain}
-\title{Train a pretrain SurvivEHR model from R data frames}
+\title{Pre-train the RSurvivEHR backbone transformer}
 \usage{
 survivehr_pretrain(
   events,
@@ -12,31 +12,113 @@ survivehr_pretrain(
 )
 }
 \arguments{
-\item{events}{data.frame with columns patient_id, event, age, optional value.}
+\item{events}{A \code{data.frame} with columns \code{patient_id}, \code{event}, \code{age}
+(and optionally \code{value}).  Validated with
+\code{survivehr_validate_events()} before being passed to Python.}
 
-\item{static_covariates}{optional data.frame with patient_id + numeric columns.}
+\item{static_covariates}{An optional \code{data.frame} with \code{patient_id} and
+covariate columns.  Categorical columns are one-hot encoded
+automatically; numeric columns pass through unchanged.  Pass \code{NULL}
+(default) to train without static features.}
 
-\item{config}{list from \code{survivehr_config()}.}
+\item{config}{A named list from \code{survivehr_config()} specifying
+architecture and training hyperparameters.}
 
-\item{event_vocab}{optional named integer map to keep fixed tokenization.}
+\item{event_vocab}{An optional named integer vector fixing the token
+mapping.  Useful when pre-training multiple models that must share
+the same vocabulary.  \code{NULL} (default) builds the vocabulary from
+the supplied events, ordered by descending frequency.}
 }
 \value{
-A named list (model bundle) with elements \code{model}, \code{event_vocab},
-\code{inv_vocab}, \code{config}, \code{time_scale}, and \code{token_policy}.
+A named list (model bundle) with elements:
+\describe{
+\item{\code{model}}{The trained PyTorch model object.}
+\item{\code{event_vocab}}{Named integer vector mapping event codes to
+token IDs (frequency-descending order, most common = smallest ID).}
+\item{\code{inv_vocab}}{Reverse mapping from token IDs to event codes.}
+\item{\code{config}}{The configuration used for training.}
+\item{\code{time_scale}}{The prediction window / age normalisation divisor
+stored in the bundle.}
+\item{\code{token_policy}}{Token policy flags (\code{include_unk},
+\code{include_cls_sep}).}
+\item{\code{history}}{List of per-epoch training losses.}
+\item{\code{device}}{String identifying the compute device used
+(e.g. \code{"cpu"} or \code{"cuda:0"}).}
+}
 }
 \description{
-Train a pretrain SurvivEHR model from R data frames
+Builds the event vocabulary from the supplied event history, then
+pre-trains the transformer backbone with a competing-risk or single-risk
+survival head that predicts \strong{when} the next clinical event will occur
+(over all vocabulary tokens).  The resulting model bundle can be passed
+directly to \code{survivehr_finetune()} or saved with \code{survivehr_save_model()}
+for later reuse.
+}
+\details{
+Pre-training does \strong{not} require a \code{targets} frame — the next-event age
+in each patient's raw sequence serves as the supervision signal.
 }
 \examples{
 \dontrun{
-events <- data.frame(
-  patient_id = c(1L,1L,1L, 2L,2L,2L),
-  event  = c("HYPERTENSION","STATIN","T2D", "T2D","METFORMIN","HYPERTENSION"),
-  age    = c(50, 50.5, 52,  45, 45.3, 47.5)
+# ---- Pre-training on the 10-patient population from the Getting Started
+#      vignette.  Patients 1-3 have CVD in their history so the vocabulary
+#      includes CVD — required for CVD fine-tuning later.
+events_pop <- data.frame(
+  patient_id = c(rep(1,4), rep(2,6), rep(3,6), rep(4,4), rep(5,6),
+                 rep(6,4), rep(7,4), rep(8,4), rep(9,6), rep(10,4)),
+  event = c(
+    "HYPERTENSION","STATIN","BP_CHECK","CVD",
+    "HYPERTENSION","BP_CHECK","T2D","METFORMIN","HYPERTENSION","CVD",
+    "HYPERTENSION","BP_CHECK","STATIN","T2D","BP_CHECK","CVD",
+    "HYPERTENSION","STATIN","T2D","METFORMIN",
+    "HYPERTENSION","BP_CHECK","T2D","HBA1C","METFORMIN","STATIN",
+    "HYPERTENSION","AMLODIPINE","BP_CHECK","STATIN",
+    "STATIN","T2D","HBA1C","METFORMIN",
+    "HYPERTENSION","BP_CHECK","STATIN","T2D",
+    "HYPERTENSION","BP_CHECK","T2D","METFORMIN","HBA1C","STATIN",
+    "STATIN","BP_CHECK","HYPERTENSION","T2D"
+  ),
+  age = c(
+    55.0, 55.5, 56.2, 58.0,
+    44.0, 45.5, 48.0, 48.3, 50.5, 52.0,
+    58.0, 59.5, 62.0, 63.5, 64.0, 65.5,
+    45.0, 45.5, 47.0, 48.3,
+    48.0, 49.0, 51.0, 52.0, 53.0, 54.5,
+    60.0, 61.0, 62.3, 63.0,
+    40.0, 42.0, 43.5, 44.8,
+    58.0, 59.2, 60.0, 62.0,
+    46.0, 47.5, 50.0, 52.0, 52.5, 54.0,
+    44.0, 46.5, 47.0, 48.5
+  ),
+  value = c(
+    NA,  NA,  148, NA,
+    NA,  145, NA,  NA,  NA,  NA,
+    NA,  158, NA,  NA,  162, NA,
+    NA,  NA,  NA,  NA,
+    NA,  152, NA,  68,  NA,  NA,
+    NA,  NA,  155, NA,
+    NA,  NA,  74,  NA,
+    NA,  145, NA,  NA,
+    NA,  138, NA,  NA,  71,  NA,
+    NA,  138, NA,  NA
+  )
 )
-static <- data.frame(patient_id=c(1L,2L), sex=c("M","F"), imd=c(3L,1L))
-cfg    <- survivehr_config(block_size=32, n_layer=2, n_head=2, n_embd=64, epochs=1)
-pt     <- survivehr_pretrain(events, static, cfg)
-pt$event_vocab  # <PAD>=0, <UNK>=1, HYPERTENSION=2, ...
+static_pop <- data.frame(
+  patient_id    = 1:10,
+  SEX           = c("M","F","M","F","M","F","M","F","M","F"),
+  ETHNICITY     = c("White","Asian","White","Black","White",
+                    "Asian","White","White","Black","White"),
+  IMD           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
+  YEAR_OF_BIRTH = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
+)
+# 5-year prediction window; ages are in years
+cfg <- survivehr_config(
+  block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
+  epochs = 10, batch_size = 4, time_scale = 5.0
+)
+pt <- survivehr_pretrain(events_pop, static_pop, cfg)
+# Vocabulary is frequency-ordered: most-common events get the smallest IDs
+# e.g. <PAD>=0, <UNK>=1, HYPERTENSION=2, BP_CHECK=3, STATIN=4, T2D=5, ...
+pt$event_vocab
 }
 }

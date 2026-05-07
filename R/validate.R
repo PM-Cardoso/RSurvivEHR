@@ -1,8 +1,26 @@
-#' Validate events schema for SurvivEHR
+#' Validate the events data frame for RSurvivEHR
 #'
-#' @param events data.frame with columns `patient_id`, `event`, `age` (or FastEHR aliases
-#'   `PATIENT_ID`, `EVENT`, `DAYS_SINCE_BIRTH`), optional `value`/`VALUE`.
-#' @return Invisibly returns TRUE.
+#' Checks that the events data frame supplied to
+#' `survivehr_pretrain()`, `survivehr_finetune()`, or `survivehr_predict()`
+#' is correctly formatted before any Python call is made, giving an
+#' informative R error instead of a cryptic Python traceback.  Specifically,
+#' it verifies that the required columns are present, that ages are numeric
+#' and non-negative, and that rows are time-ordered within each patient.
+#'
+#' @param events A `data.frame` with columns:
+#'   \describe{
+#'     \item{`patient_id`}{Patient identifier (numeric or character).}
+#'     \item{`event`}{Clinical event code (character).}
+#'     \item{`age`}{Patient age at the event in consistent units (numeric,
+#'       non-negative, time-ordered within patient).  The uppercase alias
+#'       `DAYS_SINCE_BIRTH` is also accepted.}
+#'     \item{`value`}{(Optional) Continuous measurement recorded at the
+#'       event (e.g. blood pressure or HbA1c).  `NA` for discrete events.}
+#'   }
+#'   Uppercase column-name aliases `PATIENT_ID` and `EVENT` are also
+#'   accepted for compatibility.
+#' @return Invisibly returns `TRUE`.  Prints a confirmation message on
+#'   success.
 #' @export
 #' @examples
 #' events <- data.frame(
@@ -19,7 +37,10 @@ survivehr_validate_events <- function(events) {
   has_age <- any(c("age", "DAYS_SINCE_BIRTH") %in% names(events))
   if (!(has_patient && has_event && has_age)) {
     stop(
-      "Events must include either (`patient_id`,`event`,`age`) or FastEHR aliases (`PATIENT_ID`,`EVENT`,`DAYS_SINCE_BIRTH`).",
+      paste0(
+        "Events must include columns `patient_id`, `event`, and `age` ",
+        "(or uppercase alternatives `PATIENT_ID`, `EVENT`, `DAYS_SINCE_BIRTH`)."
+      ),
       call. = FALSE
     )
   }
@@ -51,11 +72,25 @@ survivehr_validate_events <- function(events) {
   invisible(TRUE)
 }
 
-#' Validate static covariates schema for SurvivEHR
+#' Validate the static covariates data frame for RSurvivEHR
 #'
-#' @param static_covariates data.frame with patient id and covariates. Accepts
-#'   `patient_id` or `PATIENT_ID`.
-#' @return Invisibly returns TRUE.
+#' Checks that the static covariates data frame has a `patient_id` column
+#' and at least one covariate column.  Issues a warning (not an error) when
+#' no covariate columns are found, because the backend will substitute an
+#' intercept column in that case.
+#'
+#' Categorical columns (those that are less than 80\% numeric) are
+#' one-hot encoded automatically by the Python backend.  Numeric columns
+#' are passed through unchanged.  The exact encoded column list is stored
+#' inside every model bundle; passing different columns at prediction time
+#' raises a descriptive error.
+#'
+#' @param static_covariates A `data.frame` with a `patient_id` column (or
+#'   `PATIENT_ID`) plus any number of covariate columns with freely chosen
+#'   names.  Pass the **same columns in the same order** across pretrain,
+#'   fine-tune, and prediction.
+#' @return Invisibly returns `TRUE`.  Prints a confirmation message on
+#'   success.
 #' @export
 #' @examples
 #' static <- data.frame(
@@ -82,12 +117,27 @@ survivehr_validate_static <- function(static_covariates) {
   invisible(TRUE)
 }
 
-#' Validate fine-tune targets schema for SurvivEHR
+#' Validate the fine-tune targets data frame for RSurvivEHR
 #'
-#' @param targets data.frame with columns `patient_id`, `target_event`, `target_age`
-#'   or FastEHR aliases (`PATIENT_ID`, `EVENT`, `DAYS_SINCE_BIRTH`). Optional
-#'   `target_value` / `VALUE`.
-#' @return Invisibly returns TRUE.
+#' Checks that the targets data frame supplied to `survivehr_finetune()`
+#' is correctly formatted.  Each row labels one patient: cases supply the
+#' observed outcome event and its age; censored patients supply their last
+#' observed non-outcome event and its age.
+#'
+#' @param targets A `data.frame` with columns:
+#'   \describe{
+#'     \item{`patient_id`}{Patient identifier matching the events frame.}
+#'     \item{`target_event`}{Event code for the labelled outcome (cases) or
+#'       the last observed non-outcome event (censored).}
+#'     \item{`target_age`}{Age at the target event.  Must be numeric and
+#'       non-negative.}
+#'     \item{`target_value`}{(Optional) Continuous measurement at the
+#'       target event.  `NA` for discrete events.}
+#'   }
+#'   Uppercase column-name aliases `PATIENT_ID`, `EVENT`, and
+#'   `DAYS_SINCE_BIRTH` are also accepted for compatibility.
+#' @return Invisibly returns `TRUE`.  Prints a confirmation message listing
+#'   the number of labelled patients and all observed outcome values.
 #' @export
 #' @examples
 #' targets <- data.frame(
@@ -104,7 +154,10 @@ survivehr_validate_targets <- function(targets) {
   has_age <- any(c("target_age", "TARGET_AGE", "DAYS_SINCE_BIRTH") %in% names(targets))
   if (!(has_patient && has_event && has_age)) {
     stop(
-      "Targets must include (`patient_id`,`target_event`,`target_age`) or FastEHR aliases (`PATIENT_ID`,`EVENT`,`DAYS_SINCE_BIRTH`).",
+      paste0(
+        "Targets must include columns `patient_id`, `target_event`, and `target_age` ",
+        "(or uppercase alternatives `PATIENT_ID`, `EVENT`, `DAYS_SINCE_BIRTH`)."
+      ),
       call. = FALSE
     )
   }
