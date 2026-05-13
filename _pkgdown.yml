@@ -3,6 +3,7 @@ url: https://pm-cardoso.github.io/RSurvivEHR/
 template:
   bootstrap: 5
   bootswatch: flatly
+  search: true
   includes:
     in_header: |
       <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -89,6 +90,7 @@ reference:
       - survivehr_pretrain
       - survivehr_finetune
       - survivehr_predict
+      - survivehr_predict_value
       - survivehr_save_model
       - survivehr_load_model
 

@@ -11,7 +11,9 @@
 #' in each patient's raw sequence serves as the supervision signal.
 #'
 #' @param events A `data.frame` with columns `patient_id`, `event`, `age`
-#'   (and optionally `value`).  Validated with
+#'   (and optionally `value`) — lowercase is the preferred canonical form;
+#'   uppercase aliases `PATIENT_ID`, `EVENT`, `DAYS_SINCE_BIRTH` are accepted
+#'   for backward compatibility.  Validated with
 #'   `survivehr_validate_events()` before being passed to Python.
 #' @param static_covariates An optional `data.frame` with `patient_id` and
 #'   covariate columns.  Categorical columns are one-hot encoded
@@ -86,11 +88,11 @@
 #' )
 #' static_pop <- data.frame(
 #'   patient_id    = 1:10,
-#'   SEX           = c("M","F","M","F","M","F","M","F","M","F"),
-#'   ETHNICITY     = c("White","Asian","White","Black","White",
+#'   sex           = c("M","F","M","F","M","F","M","F","M","F"),
+#'   ethnicity     = c("White","Asian","White","Black","White",
 #'                     "Asian","White","White","Black","White"),
-#'   IMD           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
-#'   YEAR_OF_BIRTH = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
+#'   imd           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
+#'   year_of_birth = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
 #' )
 #' # 5-year prediction window; ages are in years
 #' cfg <- survivehr_config(
@@ -274,23 +276,37 @@ survivehr_finetune <- function(events,
 #'   same covariate columns used at training time.
 #' @param max_new_tokens number of autoregressive steps (pretrain models only;
 #'   ignored for fine-tuned models).
+#' @param eval_times An optional numeric vector of time points (in the same
+#'   units as `age`) at which to read the cumulative-incidence CDF for
+#'   fine-tuned models.  Each value must be in `(0, time_scale]` — the model's
+#'   trained prediction window.  For example, with `time_scale = 5.0` (years)
+#'   use `eval_times = c(1, 2, 3, 5)` to obtain 1-, 2-, 3- and 5-year risks.
+#'   When `NULL` (default) only `_cdf_last` (risk at the full horizon) and
+#'   `_auc` (average risk) are returned, preserving backward compatibility.
+#'   Ignored for pretrain models.
 #' @return For a **fine-tuned** model, a `data.frame` with columns:
 #'   \describe{
 #'     \item{`patient_id`}{Patient identifier.}
-#'     \item{`{outcome}_cdf_last`}{Cumulative incidence of `outcome` at the
-#'       end of the prediction window.  The window spans
-#'       \code{[0, time_scale]} in the same units as `age`
-#'       (e.g. 0–5 years when `time_scale = 5.0`).  `time_scale` is stored
-#'       in the model bundle and used automatically — no need to supply it at
-#'       prediction time.}
-#'     \item{`{outcome}_auc`}{Area under the CDF curve integrated from 0 to
-#'       `time_scale`.  Interpretable as the average cumulative risk over the
-#'       prediction window.  Values closer to 1 indicate higher overall risk;
-#'       values closer to 0 indicate lower risk.}
+#'     \item{`{outcome}_cdf_last`}{Cumulative incidence at the **end** of the
+#'       prediction window (`t = time_scale`).}
+#'     \item{`{outcome}_auc`}{Area under the CDF integrated from 0 to
+#'       `time_scale`.  Interpretable as average risk over the window.}
+#'     \item{`{outcome}_cdf_t{X}`}{*(Only when `eval_times` is supplied.)*
+#'       Cumulative incidence at time `X` (same units as `age`).  One column
+#'       per requested time point, e.g. `CVD_cdf_t1`, `CVD_cdf_t2.5`.}
 #'   }
-#'   For a **pretrain** model, a `data.frame` with columns
-#'   `patient_id`, `generated_token`, `generated_event`, `generated_age`,
-#'   `generated_value`.
+#'   For a **pretrain** model, a `data.frame` with one row per generated step
+#'   per patient:
+#'   \describe{
+#'     \item{`patient_id`}{Patient identifier.}
+#'     \item{`step`}{Generation step (1 = next event, 2 = event after that, …).}
+#'     \item{`generated_token`}{Vocabulary token ID of the generated event.}
+#'     \item{`generated_event`}{Decoded event name (e.g. `"HYPERTENSION"`).}
+#'     \item{`generated_age`}{Predicted age of the generated event in the same
+#'       units as `age` (de-normalised by `time_scale`).}
+#'     \item{`generated_value`}{Predicted numeric value for that event (e.g.
+#'       a lab result); `NaN` for non-measurement events.}
+#'   }
 #' @export
 #' @examples
 #' \dontrun{
@@ -310,7 +326,8 @@ survivehr_finetune <- function(events,
 survivehr_predict <- function(model_bundle,
                               events,
                               static_covariates = NULL,
-                              max_new_tokens = 1L) {
+                              max_new_tokens = 1L,
+                              eval_times = NULL) {
   survivehr_validate_events(events)
   if (!is.null(static_covariates)) {
     survivehr_validate_static(static_covariates)
@@ -320,7 +337,72 @@ survivehr_predict <- function(model_bundle,
     model_bundle = model_bundle,
     events_df = events,
     static_df = static_covariates,
-    max_new_tokens = as.integer(max_new_tokens)
+    max_new_tokens = as.integer(max_new_tokens),
+    eval_times = if (is.null(eval_times)) NULL else as.list(as.numeric(eval_times))
+  )
+  reticulate::py_to_r(out)
+}
+
+#' Predict the numeric value of a named event (pretrain or fine-tuned models)
+#'
+#' Queries the backbone's Gaussian value regression head to estimate the
+#' numeric measurement (e.g. blood pressure, HbA1c) that would be recorded
+#' alongside a specific clinical event, given each patient's history in
+#' `events`.
+#'
+#' The value head is trained during pre-training on events that carried
+#' non-`NA` `value` entries.  For events that never appeared with a value
+#' (e.g. `"CVD"`, which is a discrete diagnosis), the function returns `NaN`
+#' for both the mean and standard deviation.  The head is preserved in
+#' fine-tuned bundles because fine-tuning only replaces the outcome survival
+#' head, not the backbone.
+#'
+#' @param model_bundle A model bundle returned by `survivehr_pretrain()`,
+#'   `survivehr_finetune()`, or `survivehr_load_model()`.
+#' @param events A `data.frame` with columns `patient_id`, `event`, `age`,
+#'   optional `value`.  The `outcome_event` code should **not** appear in
+#'   this frame (same leakage-free filtering as for fine-tuning and
+#'   prediction).
+#' @param outcome_event Character scalar.  The event code whose value should
+#'   be predicted (e.g. `"BP_CHECK"` for blood pressure).  Must exist in the
+#'   model vocabulary built at pre-training time.
+#' @param static_covariates An optional `data.frame` with `patient_id` and
+#'   the same covariate columns used at training time.  Pass `NULL` to omit.
+#' @return A `data.frame` with one row per patient and columns:
+#'   \describe{
+#'     \item{`patient_id`}{Patient identifier.}
+#'     \item{`outcome_event`}{The event code that was queried.}
+#'     \item{`predicted_value_mean`}{Predicted mean of the Gaussian
+#'       distribution for the event's numeric value.  `NaN` if the event
+#'       never appeared with a value at pre-training time.}
+#'     \item{`predicted_value_sd`}{Predicted standard deviation.  `NaN` for
+#'       the same reason as above.}
+#'   }
+#' @export
+#' @examples
+#' \dontrun{
+#' # Using pt_model and events_pop / static_pop from survivehr_pretrain() example.
+#' # Predict the expected blood-pressure reading at the next BP_CHECK.
+#' # (Remove BP_CHECK from context first — same leakage-free logic.)
+#' ctx <- events_pop[events_pop$event != "BP_CHECK", ]
+#' bp_preds <- survivehr_predict_value(pt_model, ctx, "BP_CHECK", static_pop)
+#' print(bp_preds)
+#' # Columns: patient_id, outcome_event, predicted_value_mean, predicted_value_sd
+#' }
+survivehr_predict_value <- function(model_bundle,
+                                    events,
+                                    outcome_event,
+                                    static_covariates = NULL) {
+  survivehr_validate_events(events)
+  if (!is.null(static_covariates)) {
+    survivehr_validate_static(static_covariates)
+  }
+  backend <- .survivehr_backend()
+  out <- backend$predict_outcome_value(
+    model_bundle  = model_bundle,
+    events_df     = events,
+    outcome_event = as.character(outcome_event),
+    static_df     = static_covariates
   )
   reticulate::py_to_r(out)
 }

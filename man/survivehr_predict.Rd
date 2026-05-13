@@ -8,7 +8,8 @@ survivehr_predict(
   model_bundle,
   events,
   static_covariates = NULL,
-  max_new_tokens = 1L
+  max_new_tokens = 1L,
+  eval_times = NULL
 )
 }
 \arguments{
@@ -23,25 +24,40 @@ same covariate columns used at training time.}
 
 \item{max_new_tokens}{number of autoregressive steps (pretrain models only;
 ignored for fine-tuned models).}
+
+\item{eval_times}{An optional numeric vector of time points (in the same
+units as \code{age}) at which to read the cumulative-incidence CDF for
+fine-tuned models.  Each value must be in \verb{(0, time_scale]} — the model's
+trained prediction window.  For example, with \code{time_scale = 5.0} (years)
+use \code{eval_times = c(1, 2, 3, 5)} to obtain 1-, 2-, 3- and 5-year risks.
+When \code{NULL} (default) only \verb{_cdf_last} (risk at the full horizon) and
+\verb{_auc} (average risk) are returned, preserving backward compatibility.
+Ignored for pretrain models.}
 }
 \value{
 For a \strong{fine-tuned} model, a \code{data.frame} with columns:
 \describe{
 \item{\code{patient_id}}{Patient identifier.}
-\item{\verb{\{outcome\}_cdf_last}}{Cumulative incidence of \code{outcome} at the
-end of the prediction window.  The window spans
-\code{[0, time_scale]} in the same units as \code{age}
-(e.g. 0–5 years when \code{time_scale = 5.0}).  \code{time_scale} is stored
-in the model bundle and used automatically — no need to supply it at
-prediction time.}
-\item{\verb{\{outcome\}_auc}}{Area under the CDF curve integrated from 0 to
-\code{time_scale}.  Interpretable as the average cumulative risk over the
-prediction window.  Values closer to 1 indicate higher overall risk;
-values closer to 0 indicate lower risk.}
+\item{\verb{\{outcome\}_cdf_last}}{Cumulative incidence at the \strong{end} of the
+prediction window (\code{t = time_scale}).}
+\item{\verb{\{outcome\}_auc}}{Area under the CDF integrated from 0 to
+\code{time_scale}.  Interpretable as average risk over the window.}
+\item{\verb{\{outcome\}_cdf_t\{X\}}}{\emph{(Only when \code{eval_times} is supplied.)}
+Cumulative incidence at time \code{X} (same units as \code{age}).  One column
+per requested time point, e.g. \code{CVD_cdf_t1}, \code{CVD_cdf_t2.5}.}
 }
-For a \strong{pretrain} model, a \code{data.frame} with columns
-\code{patient_id}, \code{generated_token}, \code{generated_event}, \code{generated_age},
-\code{generated_value}.
+For a \strong{pretrain} model, a \code{data.frame} with one row per generated step
+per patient:
+\describe{
+\item{\code{patient_id}}{Patient identifier.}
+\item{\code{step}}{Generation step (1 = next event, 2 = event after that, …).}
+\item{\code{generated_token}}{Vocabulary token ID of the generated event.}
+\item{\code{generated_event}}{Decoded event name (e.g. \code{"HYPERTENSION"}).}
+\item{\code{generated_age}}{Predicted age of the generated event in the same
+units as \code{age} (de-normalised by \code{time_scale}).}
+\item{\code{generated_value}}{Predicted numeric value for that event (e.g.
+a lab result); \code{NaN} for non-measurement events.}
+}
 }
 \description{
 Runs forward inference on new event sequences using a fine-tuned model

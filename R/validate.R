@@ -7,18 +7,20 @@
 #' it verifies that the required columns are present, that ages are numeric
 #' and non-negative, and that rows are time-ordered within each patient.
 #'
-#' @param events A `data.frame` with columns:
+#' @param events A `data.frame` with columns (lowercase is the preferred
+#'   canonical form; uppercase aliases are accepted for backward compatibility):
 #'   \describe{
-#'     \item{`patient_id`}{Patient identifier (numeric or character).}
-#'     \item{`event`}{Clinical event code (character).}
+#'     \item{`patient_id`}{Patient identifier (numeric or character).
+#'       Alias: `PATIENT_ID`.}
+#'     \item{`event`}{Clinical event code (character).
+#'       Alias: `EVENT`.}
 #'     \item{`age`}{Patient age at the event in consistent units (numeric,
-#'       non-negative, time-ordered within patient).  The uppercase alias
-#'       `DAYS_SINCE_BIRTH` is also accepted.}
+#'       non-negative, time-ordered within patient).
+#'       Alias: `DAYS_SINCE_BIRTH`.}
 #'     \item{`value`}{(Optional) Continuous measurement recorded at the
-#'       event (e.g. blood pressure or HbA1c).  `NA` for discrete events.}
+#'       event (e.g. blood pressure or HbA1c).  `NA` for discrete events.
+#'       Alias: `VALUE`.}
 #'   }
-#'   Uppercase column-name aliases `PATIENT_ID` and `EVENT` are also
-#'   accepted for compatibility.
 #' @return Invisibly returns `TRUE`.  Prints a confirmation message on
 #'   success.
 #' @export
@@ -85,10 +87,11 @@ survivehr_validate_events <- function(events) {
 #' inside every model bundle; passing different columns at prediction time
 #' raises a descriptive error.
 #'
-#' @param static_covariates A `data.frame` with a `patient_id` column (or
-#'   `PATIENT_ID`) plus any number of covariate columns with freely chosen
-#'   names.  Pass the **same columns in the same order** across pretrain,
-#'   fine-tune, and prediction.
+#' @param static_covariates A `data.frame` with a `patient_id` column
+#'   (lowercase preferred; `PATIENT_ID` accepted for backward compatibility)
+#'   plus any number of covariate columns with freely chosen names — lowercase
+#'   is recommended for consistency.  Pass the **same columns in the same
+#'   order** across pretrain, fine-tune, and prediction.
 #' @return Invisibly returns `TRUE`.  Prints a confirmation message on
 #'   success.
 #' @export
@@ -124,18 +127,21 @@ survivehr_validate_static <- function(static_covariates) {
 #' observed outcome event and its age; censored patients supply their last
 #' observed non-outcome event and its age.
 #'
-#' @param targets A `data.frame` with columns:
+#' @param targets A `data.frame` with columns (lowercase is the preferred
+#'   canonical form; uppercase aliases are accepted for backward compatibility):
 #'   \describe{
-#'     \item{`patient_id`}{Patient identifier matching the events frame.}
+#'     \item{`patient_id`}{Patient identifier matching the events frame.
+#'       Alias: `PATIENT_ID`.}
 #'     \item{`target_event`}{Event code for the labelled outcome (cases) or
-#'       the last observed non-outcome event (censored).}
+#'       the last observed non-outcome event (censored).
+#'       Aliases: `TARGET_EVENT`, `EVENT`.}
 #'     \item{`target_age`}{Age at the target event.  Must be numeric and
-#'       non-negative.}
+#'       non-negative.
+#'       Aliases: `TARGET_AGE`, `DAYS_SINCE_BIRTH`.}
 #'     \item{`target_value`}{(Optional) Continuous measurement at the
-#'       target event.  `NA` for discrete events.}
+#'       target event.  `NA` for discrete events.
+#'       Aliases: `TARGET_VALUE`, `VALUE`.}
 #'   }
-#'   Uppercase column-name aliases `PATIENT_ID`, `EVENT`, and
-#'   `DAYS_SINCE_BIRTH` are also accepted for compatibility.
 #' @return Invisibly returns `TRUE`.  Prints a confirmation message listing
 #'   the number of labelled patients and all observed outcome values.
 #' @export

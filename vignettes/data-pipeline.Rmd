@@ -293,6 +293,50 @@ processes `tokens`, `ages`, `values`, `attention_mask`, and
 then integrates those embeddings over the prediction window to produce the
 survival CDF returned to R as `_cdf_last` and `_auc` columns.
 
+### Prediction paths
+
+At inference time three distinct output paths branch off the same transformer
+hidden states:
+
+**1. Fine-tuned CDF columns** (`survivehr_predict()` on a fine-tuned bundle)
+
+The fine-tune survival head (`ODESurvCompetingRiskLayer` or
+`CausalODESurvSingleRiskLayer`) integrates the last-attended hidden state over
+a normalised grid of 1 000 equally-spaced time steps from 0 to 1.  The full
+CDF array has shape `[n_patients, 1000]`.  Three outputs are derived:
+
+- `{outcome}_cdf_last` — value at grid index 999 (normalised time 1.0 =
+  `time_scale` in raw units).
+- `{outcome}_auc` — mean of the 1 000 CDF values (trapezoidal approximation
+  to the area under the curve).
+- `{outcome}_cdf_t{X}` *(when `eval_times` is supplied)* — value at grid
+  index `round((X / time_scale) × 999)`, clamped to `[0, 999]`.
+
+**2. Multi-step autoregressive generation** (`survivehr_predict()` on a
+pretrain bundle)
+
+The causal survival backbone's `generate()` method extends the token and age
+sequences step-by-step.  At each step it samples the next token from the
+language-model head softmax and draws the next age from the TTE distribution.  
+The newly appended positions (indices `≥ orig_len`) are collected into one row
+per patient per step.  Ages are de-normalised by multiplying by `time_scale`.
+The value regression head is also queried at each new position to populate
+`generated_value` (see path 3).
+
+**3. Value regression head** (`survivehr_predict_value()` or the
+`generated_value` column)
+
+`GaussianRegressionLayer` (source:
+[`inst/python/SurvivEHR/src/modules/head_layers/value_layers.py`](https://github.com/PM-Cardoso/RSurvivEHR/blob/main/inst/python/SurvivEHR/src/modules/head_layers/value_layers.py))
+projects the last hidden state through a per-token `nn.Linear(n_embd, 2)`
+head, returning `Normal(μ, σ)`.  The mean `μ` and standard deviation `σ` are
+returned as `predicted_value_mean` and `predicted_value_sd`.
+
+> **No internal standardisation**: values are stored and predicted in the same
+> units supplied in the `value` column.  Pre-normalise measurements before
+> training if different event types carry values on different scales (e.g.
+> blood pressure in mmHg vs HbA1c in mmol/mol).
+
 ---
 
 ## Summary diagram

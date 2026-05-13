@@ -259,6 +259,6 @@ class SurvStreamGPTForCausalModelling(nn.Module):
             tokens = tokens[:, :self.block_size]
             ages = ages[:, :self.block_size]
             values = values[:, :self.block_size]
-            attention_mask[:, :self.block_size]
+            attention_mask = attention_mask[:, :self.block_size]
 
         return tokens, ages, values, attention_mask

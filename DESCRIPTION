@@ -1,7 +1,7 @@
 Package: RSurvivEHR
 Type: Package
 Title: Survival Analysis on Electronic Health Records via SurvivEHR
-Version: 0.7.9
+Version: 0.8.1
 Authors@R: person(given = "Pedro", family = "Cardoso", role = c("aut", "cre"),
     email = "p.cardoso@exeter.ac.uk", comment = c(ORCID = "0000-0002-1014-9058"))
 Description: An R interface to SurvivEHR, a transformer-based survival model
@@ -9,10 +9,13 @@ Description: An R interface to SurvivEHR, a transformer-based survival model
     from clinical event sequences, pre-train a competing-risk or single-risk
     survival backbone, fine-tune on labelled outcomes (single-risk or
     competing-risk), and predict cumulative-incidence curves — all from plain
-    R data frames. Supports biomarker values alongside discrete events,
-    leakage-free cohort construction helpers, and frequency-ordered
-    vocabularies. The Python backend is vendored inside the package and
-    managed automatically via 'reticulate'.
+    R data frames. Input data frames use consistent lowercase column names
+    (`patient_id`, `event`, `age`, `value`; `patient_id`, `target_event`,
+    `target_age`); uppercase aliases are accepted for backward compatibility.
+    Supports biomarker values alongside discrete events, leakage-free cohort
+    construction helpers, and frequency-ordered vocabularies. The Python
+    backend is vendored inside the package and managed automatically via
+    'reticulate'.
 License: GPL-3
 Encoding: UTF-8
 LazyData: false
