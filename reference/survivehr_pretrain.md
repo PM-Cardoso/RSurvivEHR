@@ -156,7 +156,7 @@ cfg <- survivehr_config(
 )
 pt <- survivehr_pretrain(events_pop, static_pop, cfg)
 # Vocabulary is frequency-ordered: most-common events get the smallest IDs
-# e.g. <PAD>=0, <UNK>=1, HYPERTENSION=2, BP_CHECK=3, STATIN=4, T2D=5, ...
+# HYPERTENSION=10, BP_CHECK=9, STATIN=9, T2D=8, METFORMIN=5, CVD=3, HBA1C=3, AMLODIPINE=1
 pt$event_vocab
 } # }
 ```

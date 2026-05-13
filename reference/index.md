@@ -24,6 +24,9 @@ Pre-train, fine-tune, save, and load SurvivEHR models.
   : Fine-tune the RSurvivEHR backbone on labelled outcomes
 - [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
   : Predict cumulative incidence with a fine-tuned RSurvivEHR model
+- [`survivehr_predict_value()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict_value.md)
+  : Predict the numeric value of a named event (pretrain or fine-tuned
+  models)
 - [`survivehr_save_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.md)
   : Save an RSurvivEHR model bundle to disk
 - [`survivehr_load_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_load_model.md)

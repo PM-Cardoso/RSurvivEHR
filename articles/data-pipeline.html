@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.9</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -518,7 +518,61 @@ produce contextual embeddings. The survival ODE head (source: <a href="https://g
 then integrates those embeddings over the prediction window to produce
 the survival CDF returned to R as <code>_cdf_last</code> and
 <code>_auc</code> columns.</p>
+<div class="section level3">
+<h3 id="prediction-paths">Prediction paths<a class="anchor" aria-label="anchor" href="#prediction-paths"></a>
+</h3>
+<p>At inference time three distinct output paths branch off the same
+transformer hidden states:</p>
+<p><strong>1. Fine-tuned CDF columns</strong>
+(<code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code> on a fine-tuned bundle)</p>
+<p>The fine-tune survival head (<code>ODESurvCompetingRiskLayer</code>
+or <code>CausalODESurvSingleRiskLayer</code>) integrates the
+last-attended hidden state over a normalised grid of 1 000
+equally-spaced time steps from 0 to 1. The full CDF array has shape
+<code>[n_patients, 1000]</code>. Three outputs are derived:</p>
+<ul>
+<li>
+<code>{outcome}_cdf_last</code> — value at grid index 999
+(normalised time 1.0 = <code>time_scale</code> in raw units).</li>
+<li>
+<code>{outcome}_auc</code> — mean of the 1 000 CDF values
+(trapezoidal approximation to the area under the curve).</li>
+<li>
+<code>{outcome}_cdf_t{X}</code> <em>(when <code>eval_times</code> is
+supplied)</em> — value at grid index
+<code>round((X / time_scale) × 999)</code>, clamped to
+<code>[0, 999]</code>.</li>
+</ul>
+<p><strong>2. Multi-step autoregressive generation</strong>
+(<code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code> on a pretrain bundle)</p>
+<p>The causal survival backbone’s <code>generate()</code> method extends
+the token and age sequences step-by-step. At each step it samples the
+next token from the language-model head softmax and draws the next age
+from the TTE distribution.<br>
+The newly appended positions (indices <code>≥ orig_len</code>) are
+collected into one row per patient per step. Ages are de-normalised by
+multiplying by <code>time_scale</code>. The value regression head is
+also queried at each new position to populate
+<code>generated_value</code> (see path 3).</p>
+<p><strong>3. Value regression head</strong>
+(<code><a href="../reference/survivehr_predict_value.html">survivehr_predict_value()</a></code> or the
+<code>generated_value</code> column)</p>
+<p><code>GaussianRegressionLayer</code> (source: <a href="https://github.com/PM-Cardoso/RSurvivEHR/blob/main/inst/python/SurvivEHR/src/modules/head_layers/value_layers.py" class="external-link"><code>inst/python/SurvivEHR/src/modules/head_layers/value_layers.py</code></a>)
+projects the last hidden state through a per-token
+<code>nn.Linear(n_embd, 2)</code> head, returning
+<code>Normal(μ, σ)</code>. The mean <code>μ</code> and standard
+deviation <code>σ</code> are returned as
+<code>predicted_value_mean</code> and
+<code>predicted_value_sd</code>.</p>
+<blockquote>
+<p><strong>No internal standardisation</strong>: values are stored and
+predicted in the same units supplied in the <code>value</code> column.
+Pre-normalise measurements before training if different event types
+carry values on different scales (e.g. blood pressure in mmHg vs HbA1c
+in mmol/mol).</p>
+</blockquote>
 <hr>
+</div>
 </div>
 <div class="section level2">
 <h2 id="summary-diagram">Summary diagram<a class="anchor" aria-label="anchor" href="#summary-diagram"></a>

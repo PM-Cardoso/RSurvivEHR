@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.9</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -213,31 +213,34 @@ patient:</p>
 <p><strong>Column naming rule</strong>: <code>patient_id</code> (or the
 uppercase alias <code>PATIENT_ID</code>) is the only reserved name in
 the static table. All other column names are
-<strong>user-defined</strong> — call them <code>SEX</code>,
-<code>imd</code>, <code>YearOfBirth</code>, or anything else. The column
-names become the basis for encoded feature names (e.g. <code>SEX</code>
-→ <code>SEX_F</code>, <code>SEX_M</code>). This is in contrast to the
-<strong>events</strong> and <strong>targets</strong> tables, which
-require fixed column names (<code>patient_id</code>, <code>event</code>,
-<code>age</code>, <code>value</code>) — see the <em>Column name
-aliases</em> section below for accepted uppercase alternatives. The only
-constraint for static columns is <strong>consistency</strong>: the exact
-same names must be used at pretrain, fine-tune, and predict time.</p>
+<strong>user-defined</strong> — lowercase is recommended for consistency
+(e.g. <code>sex</code>, <code>imd</code>, <code>year_of_birth</code>).
+The column names become the basis for encoded feature names after
+one-hot expansion (e.g. <code>sex</code> → <code>sex_F</code>,
+<code>sex_M</code>). This is in contrast to the <strong>events</strong>
+and <strong>targets</strong> tables, which require fixed lowercase
+column names (<code>patient_id</code>, <code>event</code>,
+<code>age</code>, <code>value</code>) — uppercase aliases are accepted
+for backward compatibility but lowercase is the canonical form. See the
+<em>Column name aliases</em> section below. The only constraint for
+static columns is <strong>consistency</strong>: the exact same names
+must be used at pretrain, fine-tune, and predict time.</p>
 </blockquote>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">static_covariates</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  patient_id     <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">3</span>,</span>
-<span>  SEX            <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"M"</span>,     <span class="st">"F"</span>,     <span class="st">"M"</span><span class="op">)</span>,       <span class="co"># → SEX_F, SEX_M</span></span>
-<span>  ETHNICITY      <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"White"</span>, <span class="st">"Asian"</span>, <span class="st">"White"</span><span class="op">)</span>,   <span class="co"># → ETHNICITY_Asian, ETHNICITY_White</span></span>
-<span>  SMOKING_STATUS <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Never"</span>, <span class="st">"Ex"</span>,    <span class="st">"Current"</span><span class="op">)</span>, <span class="co"># → SMOKING_STATUS_Current, ..., Never</span></span>
-<span>  IMD            <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span><span class="op">)</span>,                 <span class="co"># numeric, passed through</span></span>
-<span>  YEAR_OF_BIRTH  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1965L</span>, <span class="fl">1972L</span>, <span class="fl">1955L</span><span class="op">)</span>         <span class="co"># numeric, passed through</span></span>
+<span>  sex            <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"M"</span>,     <span class="st">"F"</span>,     <span class="st">"M"</span><span class="op">)</span>,       <span class="co"># → sex_F, sex_M</span></span>
+<span>  ethnicity      <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"White"</span>, <span class="st">"Asian"</span>, <span class="st">"White"</span><span class="op">)</span>,   <span class="co"># → ethnicity_Asian, ethnicity_White</span></span>
+<span>  smoking_status <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Never"</span>, <span class="st">"Ex"</span>,    <span class="st">"Current"</span><span class="op">)</span>, <span class="co"># → smoking_status_Current, ..., Never</span></span>
+<span>  imd            <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span><span class="op">)</span>,                 <span class="co"># numeric, passed through</span></span>
+<span>  year_of_birth  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1965L</span>, <span class="fl">1972L</span>, <span class="fl">1955L</span><span class="op">)</span>         <span class="co"># numeric, passed through</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>The resulting static embedding for patient 1 (<code>M</code>,
-<code>White</code>, <code>Never</code>, IMD=3, YOB=1965) would be:</p>
-<pre><code>[SEX_F=0, SEX_M=1, ETHNICITY_Asian=0, ETHNICITY_White=1,
- SMOKING_STATUS_Current=0, SMOKING_STATUS_Ex=0, SMOKING_STATUS_Never=1,
- IMD=3, YEAR_OF_BIRTH=1965]</code></pre>
+<code>White</code>, <code>Never</code>, imd=3, year_of_birth=1965) would
+be:</p>
+<pre><code>[sex_F=0, sex_M=1, ethnicity_Asian=0, ethnicity_White=1,
+ smoking_status_Current=0, smoking_status_Ex=0, smoking_status_Never=1,
+ imd=3, year_of_birth=1965]</code></pre>
 <p>The <strong>same</strong> encoding scheme (same column order, same
 dummy categories) is derived at pre-train time and then
 <strong>reused</strong> at fine-tune and predict time from the saved
@@ -434,19 +437,169 @@ context filtering, and the competing-risk fine-tune on two outcomes.</p>
 <hr>
 </div>
 <div class="section level2">
+<h2 id="prediction-outputs-in-depth">Prediction outputs in depth<a class="anchor" aria-label="anchor" href="#prediction-outputs-in-depth"></a>
+</h2>
+<div class="section level3">
+<h3 id="fine-tuned-models-standard-columns">Fine-tuned models — standard columns<a class="anchor" aria-label="anchor" href="#fine-tuned-models-standard-columns"></a>
+</h3>
+<p><code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code> on a fine-tuned bundle always
+returns one row per patient with these columns per outcome:</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr class="header">
+<th>Column</th>
+<th>Description</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>{outcome}_cdf_last</code></td>
+<td>Cumulative incidence at <code>time_scale</code> (end of the
+prediction window).</td>
+</tr>
+<tr class="even">
+<td><code>{outcome}_auc</code></td>
+<td>Area under the CDF integrated over <code>[0, time_scale]</code>. A
+single scalar risk score.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section level3">
+<h3 id="fine-tuned-models-time-specific-risk-eval_times">Fine-tuned models — time-specific risk
+(<code>eval_times</code>)<a class="anchor" aria-label="anchor" href="#fine-tuned-models-time-specific-risk-eval_times"></a>
+</h3>
+<p>Pass a numeric vector of time points (in the same units as
+<code>age</code>) to get the CIF at arbitrary horizons within the
+prediction window:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># 1-, 2-, 3- and 5-year CVD / T2D risks (time_scale = 5.0)</span></span>
+<span><span class="va">preds_tp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_predict.html">survivehr_predict</a></span><span class="op">(</span></span>
+<span>  <span class="va">ft</span>, <span class="va">pred_events</span>, <span class="va">static_pop</span>,</span>
+<span>  eval_times <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span>, <span class="fl">5</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co"># Additional columns: CVD_cdf_t1, CVD_cdf_t2, CVD_cdf_t3, CVD_cdf_t5</span></span>
+<span><span class="co">#                     T2D_cdf_t1, T2D_cdf_t2, T2D_cdf_t3, T2D_cdf_t5</span></span></code></pre></div>
+<p><strong>Constraints</strong>:</p>
+<ul>
+<li>Every value must be in <code>(0, time_scale]</code>. Requesting
+beyond <code>time_scale</code> extrapolates past the ODE integration
+grid and raises an error.</li>
+<li>Values are snapped to the nearest of the 1 000 internal grid points;
+resolution ≈ <code>time_scale / 999</code> (about 0.005 years for a
+5-year window).</li>
+</ul>
+</div>
+<div class="section level3">
+<h3 id="pre-train-models-multi-step-generation">Pre-train models — multi-step generation<a class="anchor" aria-label="anchor" href="#pre-train-models-multi-step-generation"></a>
+</h3>
+<p><code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code> on a pre-trained bundle
+autoregressively samples future events. <code>max_new_tokens</code>
+controls how many steps to generate; the result is one row per patient
+per step:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">pt_preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_predict.html">survivehr_predict</a></span><span class="op">(</span><span class="va">pt</span>, <span class="va">events_pop</span>, <span class="va">static_pop</span>, max_new_tokens <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span>
+<span><span class="co"># Columns: patient_id, step, generated_token, generated_event,</span></span>
+<span><span class="co">#          generated_age, generated_value</span></span></code></pre></div>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr class="header">
+<th>Column</th>
+<th>Description</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>step</code></td>
+<td>Generation step (1 = next predicted event, 2 = one after that,
+…).</td>
+</tr>
+<tr class="even">
+<td><code>generated_event</code></td>
+<td>Decoded event name; <code>"&lt;UNK&gt;"</code> for out-of-vocabulary
+tokens.</td>
+</tr>
+<tr class="odd">
+<td><code>generated_age</code></td>
+<td>Predicted age in raw units (de-normalised:
+<code>age_norm × time_scale</code>).</td>
+</tr>
+<tr class="even">
+<td><code>generated_value</code></td>
+<td>Predicted measurement value (see below); <code>NaN</code> for
+non-measurement events.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section level3">
+<h3 id="pre-train-models-predicting-numeric-measurement-values">Pre-train models — predicting numeric measurement values<a class="anchor" aria-label="anchor" href="#pre-train-models-predicting-numeric-measurement-values"></a>
+</h3>
+<p><code><a href="../reference/survivehr_predict_value.html">survivehr_predict_value()</a></code> queries the Gaussian value
+regression head that is trained alongside the survival backbone when
+<code>value_weight &gt; 0</code>:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Predict blood-pressure reading at next BP_CHECK</span></span>
+<span><span class="va">bp_preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_predict_value.html">survivehr_predict_value</a></span><span class="op">(</span></span>
+<span>  <span class="va">pt</span>,</span>
+<span>  <span class="va">events_pop</span><span class="op">[</span><span class="va">events_pop</span><span class="op">$</span><span class="va">event</span> <span class="op">!=</span> <span class="st">"BP_CHECK"</span>, <span class="op">]</span>,</span>
+<span>  outcome_event     <span class="op">=</span> <span class="st">"BP_CHECK"</span>,</span>
+<span>  static_covariates <span class="op">=</span> <span class="va">static_pop</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co"># Columns: patient_id, outcome_event, predicted_value_mean, predicted_value_sd</span></span></code></pre></div>
+<p>The head returns <code>NaN</code> for events that never carried a
+non-<code>NA</code> <code>value</code> at pre-training time
+(e.g. discrete diagnoses like <code>"CVD"</code>).</p>
+<p><strong>Important — value scale</strong>: the model applies no
+internal standardisation to the <code>value</code> column. The head is
+trained and predicts in whatever units you supply. For measurements on
+very different scales (e.g. BP in mmHg ~140 vs HbA1c in mmol/mol ~70) or
+large absolute values, pre-normalise before training and back-transform
+predictions afterwards:</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Example: z-score per event type before training</span></span>
+<span><span class="va">scalers</span> <span class="op">&lt;-</span> <span class="va">events_pop</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">filter</span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">value</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">group_by</span><span class="op">(</span><span class="va">event</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">summarise</span><span class="op">(</span>v_mean <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">value</span><span class="op">)</span>, v_sd <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/sd.html" class="external-link">sd</a></span><span class="op">(</span><span class="va">value</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">events_scaled</span> <span class="op">&lt;-</span> <span class="va">events_pop</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">left_join</span><span class="op">(</span><span class="va">scalers</span>, by <span class="op">=</span> <span class="st">"event"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">mutate</span><span class="op">(</span>value <span class="op">=</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">if_else</span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">value</span><span class="op">)</span>,</span>
+<span>                                        <span class="op">(</span><span class="va">value</span> <span class="op">-</span> <span class="va">v_mean</span><span class="op">)</span> <span class="op">/</span> <span class="va">v_sd</span>, <span class="cn">NA_real_</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">select</span><span class="op">(</span><span class="va">patient_id</span>, <span class="va">event</span>, <span class="va">age</span>, <span class="va">value</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># After survivehr_predict_value(), back-transform:</span></span>
+<span><span class="va">preds</span> <span class="op">&lt;-</span> <span class="va">preds</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">left_join</span><span class="op">(</span><span class="va">scalers</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"outcome_event"</span> <span class="op">=</span> <span class="st">"event"</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">mutate</span><span class="op">(</span></span>
+<span>    predicted_value_mean <span class="op">=</span> <span class="va">predicted_value_mean</span> <span class="op">*</span> <span class="va">v_sd</span> <span class="op">+</span> <span class="va">v_mean</span>,</span>
+<span>    predicted_value_sd   <span class="op">=</span> <span class="va">predicted_value_sd</span>   <span class="op">*</span> <span class="va">v_sd</span></span>
+<span>  <span class="op">)</span></span></code></pre></div>
+<p>Fine-tuned bundles retain the backbone’s value regression head, so
+<code><a href="../reference/survivehr_predict_value.html">survivehr_predict_value()</a></code> works equally with pretrain and
+fine-tuned bundles.</p>
+<hr>
+</div>
+</div>
+<div class="section level2">
 <h2 id="python-environment-setup">Python environment setup<a class="anchor" aria-label="anchor" href="#python-environment-setup"></a>
 </h2>
 <p>RSurvivEHR uses <code>reticulate</code> to call the vendored backend.
 The first call to any training function will attempt to import PyTorch,
 pandas, and numpy. If these are not available in the current Python
 environment, install them:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">reticulate</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/reticulate/reference/py_install.html" class="external-link">py_install</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"torch"</span>, <span class="st">"pandas"</span>, <span class="st">"numpy"</span>, <span class="st">"lightning"</span><span class="op">)</span>,</span>
 <span>  pip <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>To pin a specific Python interpreter:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">reticulate</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/reticulate/reference/use_python.html" class="external-link">use_python</a></span><span class="op">(</span><span class="st">"/path/to/python"</span>, required <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p>See
 <code><a href="https://rstudio.github.io/reticulate/articles/python_dependencies.html" class="external-link">vignette("python_dependencies", package = "reticulate")</a></code> for

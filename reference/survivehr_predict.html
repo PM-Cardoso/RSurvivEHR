@@ -13,7 +13,7 @@ supply them at inference time."><link rel="preconnect" href="https://fonts.googl
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.9</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -58,7 +58,8 @@ supply them at inference time.</p>
 <span>  <span class="va">model_bundle</span>,</span>
 <span>  <span class="va">events</span>,</span>
 <span>  static_covariates <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  max_new_tokens <span class="op">=</span> <span class="fl">1L</span></span>
+<span>  max_new_tokens <span class="op">=</span> <span class="fl">1L</span>,</span>
+<span>  eval_times <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -85,6 +86,17 @@ same covariate columns used at training time.</p></dd>
 <dd><p>number of autoregressive steps (pretrain models only;
 ignored for fine-tuned models).</p></dd>
 
+
+<dt id="arg-eval-times">eval_times<a class="anchor" aria-label="anchor" href="#arg-eval-times"></a></dt>
+<dd><p>An optional numeric vector of time points (in the same
+units as <code>age</code>) at which to read the cumulative-incidence CDF for
+fine-tuned models.  Each value must be in <code>(0, time_scale]</code> — the model's
+trained prediction window.  For example, with <code>time_scale = 5.0</code> (years)
+use <code>eval_times = c(1, 2, 3, 5)</code> to obtain 1-, 2-, 3- and 5-year risks.
+When <code>NULL</code> (default) only <code>_cdf_last</code> (risk at the full horizon) and
+<code>_auc</code> (average risk) are returned, preserving backward compatibility.
+Ignored for pretrain models.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -92,24 +104,42 @@ ignored for fine-tuned models).</p></dd>
 <dd><p>Patient identifier.</p></dd>
 
 <dt><code>{outcome}_cdf_last</code></dt>
-<dd><p>Cumulative incidence of <code>outcome</code> at the
-end of the prediction window.  The window spans
-<code>[0, time_scale]</code> in the same units as <code>age</code>
-(e.g. 0–5 years when <code>time_scale = 5.0</code>).  <code>time_scale</code> is stored
-in the model bundle and used automatically — no need to supply it at
-prediction time.</p></dd>
+<dd><p>Cumulative incidence at the <strong>end</strong> of the
+prediction window (<code>t = time_scale</code>).</p></dd>
 
 <dt><code>{outcome}_auc</code></dt>
-<dd><p>Area under the CDF curve integrated from 0 to
-<code>time_scale</code>.  Interpretable as the average cumulative risk over the
-prediction window.  Values closer to 1 indicate higher overall risk;
-values closer to 0 indicate lower risk.</p></dd>
+<dd><p>Area under the CDF integrated from 0 to
+<code>time_scale</code>.  Interpretable as average risk over the window.</p></dd>
+
+<dt><code>{outcome}_cdf_t{X}</code></dt>
+<dd><p><em>(Only when <code>eval_times</code> is supplied.)</em>
+Cumulative incidence at time <code>X</code> (same units as <code>age</code>).  One column
+per requested time point, e.g. <code>CVD_cdf_t1</code>, <code>CVD_cdf_t2.5</code>.</p></dd>
 
 
-</dl><p>For a <strong>pretrain</strong> model, a <code>data.frame</code> with columns
-<code>patient_id</code>, <code>generated_token</code>, <code>generated_event</code>, <code>generated_age</code>,
-<code>generated_value</code>.</p>
-    </div>
+</dl><p>For a <strong>pretrain</strong> model, a <code>data.frame</code> with one row per generated step
+per patient:</p><dl><dt><code>patient_id</code></dt>
+<dd><p>Patient identifier.</p></dd>
+
+<dt><code>step</code></dt>
+<dd><p>Generation step (1 = next event, 2 = event after that, …).</p></dd>
+
+<dt><code>generated_token</code></dt>
+<dd><p>Vocabulary token ID of the generated event.</p></dd>
+
+<dt><code>generated_event</code></dt>
+<dd><p>Decoded event name (e.g. <code>"HYPERTENSION"</code>).</p></dd>
+
+<dt><code>generated_age</code></dt>
+<dd><p>Predicted age of the generated event in the same
+units as <code>age</code> (de-normalised by <code>time_scale</code>).</p></dd>
+
+<dt><code>generated_value</code></dt>
+<dd><p>Predicted numeric value for that event (e.g.
+a lab result); <code>NaN</code> for non-measurement events.</p></dd>
+
+
+</dl></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>The <code>events</code> frame should have the outcome event codes removed (same

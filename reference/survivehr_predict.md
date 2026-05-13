@@ -12,7 +12,8 @@ survivehr_predict(
   model_bundle,
   events,
   static_covariates = NULL,
-  max_new_tokens = 1L
+  max_new_tokens = 1L,
+  eval_times = NULL
 )
 ```
 
@@ -40,6 +41,17 @@ survivehr_predict(
   number of autoregressive steps (pretrain models only; ignored for
   fine-tuned models).
 
+- eval_times:
+
+  An optional numeric vector of time points (in the same units as `age`)
+  at which to read the cumulative-incidence CDF for fine-tuned models.
+  Each value must be in `(0, time_scale]` — the model's trained
+  prediction window. For example, with `time_scale = 5.0` (years) use
+  `eval_times = c(1, 2, 3, 5)` to obtain 1-, 2-, 3- and 5-year risks.
+  When `NULL` (default) only `_cdf_last` (risk at the full horizon) and
+  `_auc` (average risk) are returned, preserving backward compatibility.
+  Ignored for pretrain models.
+
 ## Value
 
 For a **fine-tuned** model, a `data.frame` with columns:
@@ -50,22 +62,48 @@ For a **fine-tuned** model, a `data.frame` with columns:
 
 - `{outcome}_cdf_last`:
 
-  Cumulative incidence of `outcome` at the end of the prediction window.
-  The window spans `[0, time_scale]` in the same units as `age` (e.g.
-  0–5 years when `time_scale = 5.0`). `time_scale` is stored in the
-  model bundle and used automatically — no need to supply it at
-  prediction time.
+  Cumulative incidence at the **end** of the prediction window
+  (`t = time_scale`).
 
 - `{outcome}_auc`:
 
-  Area under the CDF curve integrated from 0 to `time_scale`.
-  Interpretable as the average cumulative risk over the prediction
-  window. Values closer to 1 indicate higher overall risk; values closer
-  to 0 indicate lower risk.
+  Area under the CDF integrated from 0 to `time_scale`. Interpretable as
+  average risk over the window.
 
-For a **pretrain** model, a `data.frame` with columns `patient_id`,
-`generated_token`, `generated_event`, `generated_age`,
-`generated_value`.
+- `{outcome}_cdf_t{X}`:
+
+  *(Only when `eval_times` is supplied.)* Cumulative incidence at time
+  `X` (same units as `age`). One column per requested time point, e.g.
+  `CVD_cdf_t1`, `CVD_cdf_t2.5`.
+
+For a **pretrain** model, a `data.frame` with one row per generated step
+per patient:
+
+- `patient_id`:
+
+  Patient identifier.
+
+- `step`:
+
+  Generation step (1 = next event, 2 = event after that, …).
+
+- `generated_token`:
+
+  Vocabulary token ID of the generated event.
+
+- `generated_event`:
+
+  Decoded event name (e.g. `"HYPERTENSION"`).
+
+- `generated_age`:
+
+  Predicted age of the generated event in the same units as `age`
+  (de-normalised by `time_scale`).
+
+- `generated_value`:
+
+  Predicted numeric value for that event (e.g. a lab result); `NaN` for
+  non-measurement events.
 
 ## Details
 

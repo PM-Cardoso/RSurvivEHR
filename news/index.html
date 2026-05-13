@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.9</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,6 +38,82 @@
       <small>Source: <a href="https://github.com/PM-Cardoso/RSurvivEHR/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.8.1" id="rsurvivehr-081">RSurvivEHR 0.8.1<a class="anchor" aria-label="anchor" href="#rsurvivehr-081"></a></h2>
+<div class="section level4">
+<h4 id="column-naming-standardised-to-lowercase-0-8-1">Column naming standardised to lowercase<a class="anchor" aria-label="anchor" href="#column-naming-standardised-to-lowercase-0-8-1"></a></h4>
+<p>Lowercase column names are now the <strong>canonical, preferred form</strong> across all input data frames. Uppercase aliases continue to work for backward compatibility but are no longer showcased in examples.</p>
+<p><strong>Fixed/event column names</strong> (required names or their accepted aliases):</p>
+<table class="table"><thead><tr><th>Table</th>
+<th>Canonical (preferred)</th>
+<th>Accepted alias</th>
+</tr></thead><tbody><tr><td>Events</td>
+<td><code>patient_id</code></td>
+<td><code>PATIENT_ID</code></td>
+</tr><tr><td>Events</td>
+<td><code>event</code></td>
+<td><code>EVENT</code></td>
+</tr><tr><td>Events</td>
+<td><code>age</code></td>
+<td><code>DAYS_SINCE_BIRTH</code></td>
+</tr><tr><td>Events</td>
+<td><code>value</code></td>
+<td><code>VALUE</code></td>
+</tr><tr><td>Targets</td>
+<td><code>patient_id</code></td>
+<td><code>PATIENT_ID</code></td>
+</tr><tr><td>Targets</td>
+<td><code>target_event</code></td>
+<td>
+<code>TARGET_EVENT</code>, <code>EVENT</code>
+</td>
+</tr><tr><td>Targets</td>
+<td><code>target_age</code></td>
+<td>
+<code>TARGET_AGE</code>, <code>DAYS_SINCE_BIRTH</code>
+</td>
+</tr><tr><td>Targets</td>
+<td><code>target_value</code></td>
+<td>
+<code>TARGET_VALUE</code>, <code>VALUE</code>
+</td>
+</tr><tr><td>Static</td>
+<td><code>patient_id</code></td>
+<td><code>PATIENT_ID</code></td>
+</tr></tbody></table><p><strong>Static covariate column names are freely chosen by the user</strong> — lowercase is now recommended (e.g. <code>sex</code>, <code>ethnicity</code>, <code>imd</code>, <code>year_of_birth</code>) but any name is accepted.</p>
+</div>
+<div class="section level4">
+<h4 id="documentation-0-8-1">Documentation<a class="anchor" aria-label="anchor" href="#documentation-0-8-1"></a></h4>
+<ul><li>
+<code>R/validate.R</code>: <code>@param</code> descriptions for <code><a href="../reference/survivehr_validate_events.html">survivehr_validate_events()</a></code>, <code><a href="../reference/survivehr_validate_static.html">survivehr_validate_static()</a></code>, and <code><a href="../reference/survivehr_validate_targets.html">survivehr_validate_targets()</a></code> now list lowercase as canonical and show each uppercase alias explicitly.</li>
+<li>
+<code>R/train.R</code>: <code>@param events</code> clarified; <code>static_pop</code> example updated to use lowercase covariate names (<code>sex</code>, <code>ethnicity</code>, <code>imd</code>, <code>year_of_birth</code>).</li>
+<li>
+<code>vignettes/getting-started.Rmd</code>: <code>static_pop</code> example and the “Column naming” callout updated to use and recommend lowercase covariate names; validate output comment updated to match.</li>
+<li>
+<code>vignettes/advanced-topics.Rmd</code>: static covariate example and “Column naming rule” callout updated to use and recommend lowercase names; the inline encoding output example updated accordingly.</li>
+<li>
+<code>DESCRIPTION</code>: description updated to mention the lowercase column convention and backward-compatible uppercase aliases.</li>
+</ul></div>
+<div class="section level4">
+<h4 id="bug-fix-from-0-8-1">Bug fix (from 0.8.0)<a class="anchor" aria-label="anchor" href="#bug-fix-from-0-8-1"></a></h4>
+<ul><li>Fixed <code>IndexError: index 64 is out of bounds for dimension 1 with size 64</code> in <code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code> on pre-train models when one or more patients had a fully-packed context window (<code>block_size</code> events). Root cause: the <code>generate()</code> method in <code>causal.py</code> sliced <code>attention_mask[:, :block_size]</code> but forgot to assign the result back, leaving the mask one column wider than the trimmed token tensor after generation. Fixed with <code>attention_mask = attention_mask[:, :block_size]</code>.</li>
+</ul><hr></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.8.0" id="rsurvivehr-080">RSurvivEHR 0.8.0<a class="anchor" aria-label="anchor" href="#rsurvivehr-080"></a></h2>
+<div class="section level4">
+<h4 id="new-features-0-8-0">New features<a class="anchor" aria-label="anchor" href="#new-features-0-8-0"></a></h4>
+<ul><li><p><strong>Multi-step pre-train predictions</strong> (<code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code> on pre-train models): calling <code>max_new_tokens = n</code> now returns one row per generated step per patient (instead of only the first step). New columns: <code>step</code> (1-indexed generation step), <code>generated_event</code>, <code>generated_age</code> (de-normalised by <code>time_scale</code>), <code>generated_value</code> (numeric measurement or <code>NaN</code>).</p></li>
+<li><p><strong>Time-specific CDF columns</strong> (<code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code> on fine-tuned models): the new <code>eval_times</code> argument accepts a numeric vector of time points in raw units (same scale as <code>age</code>). For each time point <code>t</code> and each outcome, a column <code>{outcome}_cdf_t{t}</code> is appended to the output. Values must be in <code>(0, time_scale]</code>.</p></li>
+<li><p><strong>New function <code><a href="../reference/survivehr_predict_value.html">survivehr_predict_value()</a></code></strong>: predicts the numeric value (mean and SD of the model’s Gaussian output head) for a specified outcome event, using either a pre-train or fine-tuned model bundle. Returns a data frame with columns <code>patient_id</code>, <code>outcome_event</code>, <code>predicted_value_mean</code>, <code>predicted_value_sd</code>; <code>NaN</code> for events without a measurement head.</p></li>
+</ul></div>
+<div class="section level4">
+<h4 id="documentation-0-8-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-0-8-0"></a></h4>
+<ul><li>Updated <code>vignettes/getting-started.Rmd</code> with examples for all three new features (Sections 4 and 7).</li>
+<li>Expanded “Understanding the output columns” table to cover pre-train and value-prediction outputs in addition to fine-tuned model outputs.</li>
+</ul><hr></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.7.9" id="rsurvivehr-079">RSurvivEHR 0.7.9<a class="anchor" aria-label="anchor" href="#rsurvivehr-079"></a></h2>
 <ul><li>

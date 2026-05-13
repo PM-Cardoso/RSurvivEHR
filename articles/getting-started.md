@@ -110,21 +110,26 @@ Required columns: `patient_id`, `event`, `age`.
 One row per patient. Categorical columns (\< 80 % numeric) are one-hot
 encoded automatically; numeric columns pass through unchanged.
 
-> **Column naming**: `patient_id` is the only reserved name. Every other
-> column can be named freely — the backend encodes whatever it finds. By
-> contrast, the **events** and **targets** tables require fixed column
-> names (`patient_id`, `event`, `age`, `value`; and `patient_id`,
-> `target_event`, `target_age`, `target_value` respectively).
+> **Column naming**: `patient_id` is the only reserved name in the
+> static table. Every other column can be named freely — **lowercase is
+> recommended** for consistency with the rest of the package. The column
+> names become the basis for encoded feature names (e.g. `sex` →
+> `sex_F`, `sex_M` after one-hot encoding). By contrast, the **events**
+> and **targets** tables require fixed column names (`patient_id`,
+> `event`, `age`, `value`; and `patient_id`, `target_event`,
+> `target_age`, `target_value` respectively) — uppercase aliases are
+> accepted for backward compatibility but lowercase is the canonical
+> form.
 
 ``` r
 
 static_pop <- data.frame(
   patient_id    = 1:10,
-  SEX           = c("M","F","M","F","M","F","M","F","M","F"),
-  ETHNICITY     = c("White","Asian","White","Black","White",
+  sex           = c("M","F","M","F","M","F","M","F","M","F"),
+  ethnicity     = c("White","Asian","White","Black","White",
                     "Asian","White","White","Black","White"),
-  IMD           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
-  YEAR_OF_BIRTH = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
+  imd           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
+  year_of_birth = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
 )
 ```
 
@@ -144,7 +149,7 @@ clear R error rather than a cryptic Python traceback.
 survivehr_validate_events(events_pop)
 survivehr_validate_static(static_pop)
 # [OK] Events: 48 rows, 10 patients. Columns present, ages numeric and time-ordered.
-# [OK] Static covariates: 10 patients, 4 covariate column(s): SEX, ETHNICITY, IMD, YEAR_OF_BIRTH.
+# [OK] Static covariates: 10 patients, 4 covariate column(s): sex, ethnicity, imd, year_of_birth.
 ```
 
 ------------------------------------------------------------------------
@@ -166,7 +171,8 @@ cfg <- survivehr_config(
   epochs        = 10,
   batch_size    = 4,
   surv_layer    = "competing-risk",  # or "single-risk" — see Section 5
-  time_scale    = 5.0   # prediction window = 5 years (ages are in years)
+  time_scale    = 5.0,  # prediction window = 5 years (ages are in years)
+  value_weight  = 0.1   # weight for value regression loss (0 = disabled)
 )
 ```
 
@@ -212,6 +218,63 @@ survivehr_save_model(pt_model, "pretrain_backbone.pt")
 # Reload at any time — vocabulary, time_scale, and token policy are all preserved
 pt_model <- survivehr_load_model("pretrain_backbone.pt")
 ```
+
+### Pre-train predictions — multi-step next events
+
+The pretrain model autoregressively generates future events for each
+patient. Set `max_new_tokens` to control how many steps ahead to
+predict. Each generated step is returned as a separate row with a `step`
+column, so a `max_new_tokens = 3` call gives up to 3 rows per patient.
+
+``` r
+
+# Generate the next 3 predicted events for every patient
+pt_preds <- survivehr_predict(pt_model, events_pop, static_pop, max_new_tokens = 10)
+head(pt_preds)
+# Columns: patient_id, step, generated_token, generated_event, generated_age,
+#          generated_value
+#
+# step            : 1 = next event, 2 = event after that, 3 = third predicted event
+# generated_event : decoded event name (e.g. "HYPERTENSION", "<UNK>")
+# generated_age   : predicted age in the same units as the input age column
+# generated_value : predicted numeric value (NaN for non-measurement events)
+```
+
+### Pre-train predictions — predicted measurement value
+
+[`survivehr_predict_value()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict_value.md)
+queries the backbone’s Gaussian regression head to predict the numeric
+value that would be recorded alongside a specific clinical event. For
+example, `"BP_CHECK"` carries a blood-pressure reading in `value`; the
+model learns to predict that reading from the patient’s history.
+
+Remove the event you are querying from the context first (same
+leakage-free logic as fine-tuning).
+
+``` r
+
+# Predict the blood pressure reading at the next BP_CHECK for each patient
+bp_preds <- survivehr_predict_value(pt_model, events_pop, "BP_CHECK", static_pop)
+print(bp_preds)
+# Columns: patient_id, outcome_event, predicted_value_mean, predicted_value_sd
+#
+# predicted_value_mean : mean of the Gaussian distribution
+# predicted_value_sd   : standard deviation of the Gaussian distribution
+# NaN is returned for events that never had a numeric value at pre-training
+# time (e.g. "CVD", which is a discrete diagnosis with no value).
+```
+
+> **When are predictions meaningful?** Only events that appeared with
+> non-`NA` `value` entries at pre-training time will return non-NaN
+> predictions. In this vignette, `BP_CHECK`, `HBA1C` are the only such
+> events. All others return `NaN`.
+
+> **Value scale**: the model stores and predicts values in exactly the
+> units you supply — no internal standardisation is applied. When
+> different event types carry measurements on very different scales
+> (e.g. BP ~140 mmHg vs HbA1c ~70 mmol/mol), pre-normalise the `value`
+> column before training and back-transform predictions afterwards. See
+> the *Advanced topics* vignette for a worked example.
 
 ------------------------------------------------------------------------
 
@@ -420,18 +483,73 @@ head(preds_sr)
 # Columns: patient_id, CVD_cdf_last, CVD_auc
 ```
 
+### 7a Risk at specific time points
+
+The `eval_times` argument returns the cumulative incidence at any set of
+time points within the prediction window `(0, time_scale]`. With
+`time_scale = 5.0` (years), valid `eval_times` are any positive values
+up to and including 5.
+
+``` r
+
+# 1-year, 2-year, 3-year and 5-year (= full horizon) CVD risk
+preds_cr_tp <- survivehr_predict(
+  ft_cr2, pred_events_cr, static_pop,
+  eval_times = c(1, 2, 3, 5)
+)
+head(preds_cr_tp)
+# New columns alongside _cdf_last and _auc:
+#   CVD_cdf_t1   — cumulative CVD risk at 1 year
+#   CVD_cdf_t2   — cumulative CVD risk at 2 years
+#   CVD_cdf_t3   — cumulative CVD risk at 3 years
+#   CVD_cdf_t5   — cumulative CVD risk at 5 years (≈ CVD_cdf_last)
+#   T2D_cdf_t1   — cumulative T2D risk at 1 year  (competing-risk model)
+#   ... etc.
+```
+
+> **Boundary rule**: every value in `eval_times` must be in
+> `(0, time_scale]`. Requesting a time point beyond the prediction
+> window the model was trained on (e.g. `eval_times = 10` with
+> `time_scale = 5`) raises an error because the ODE grid does not extend
+> past the trained horizon. The internal survival ODE evaluates on a
+> fixed normalised grid of 1 000 equally-spaced steps from 0 to 1
+> (mapped back to `[0, time_scale]` in raw units); `eval_times` values
+> are snapped to the nearest grid point.
+
 ### Understanding the output columns
+
+**Fine-tuned model outputs**
+([`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)):
 
 | Column | Description |
 |----|----|
-| `{outcome}_cdf_last` | Cumulative incidence at the **end** of the prediction window. The window spans `[0, time_scale]` in the same units as `age`. With `time_scale = 5.0` (as used in this vignette), this is the estimated probability that the outcome occurs within the **next 5 years** from the patient’s last recorded event. |
-| `{outcome}_auc` | **Area under the CDF** integrated across the full prediction window. This is the average cumulative risk from time 0 to `time_scale`. Values closer to 1 indicate higher overall risk; values closer to 0 indicate lower risk. Use `auc` when you want a single scalar risk score for ranking patients. |
+| `{outcome}_cdf_last` | Cumulative incidence at the **end** of the prediction window. With `time_scale = 5.0` this is the estimated 5-year risk from the patient’s last recorded event. |
+| `{outcome}_auc` | **Area under the CDF** integrated across the full window. A single scalar risk score; values closer to 1 indicate higher overall risk. |
+| `{outcome}_cdf_t{X}` | *(Only when `eval_times` is supplied.)* Cumulative incidence at time `X` in the same units as `age`, e.g. `CVD_cdf_t1` for 1-year CVD risk. |
 
-> **Prediction window**: internally, the survival ODE evaluates the CDF
-> on a fixed grid of 1 000 equally-spaced time steps from 0 to 1 in
-> *normalised* time. Normalised time 1.0 corresponds to `time_scale` in
-> raw units. The grid is set at model architecture level (not a user
-> parameter).
+**Pre-train model outputs**
+([`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)):
+
+| Column | Description |
+|----|----|
+| `step` | Generation step index (1 = next event, 2 = event after that, …). |
+| `generated_event` | Decoded event name; `"<UNK>"` for out-of-vocabulary events. |
+| `generated_age` | Predicted event age in raw units (de-normalised by `time_scale`). |
+| `generated_value` | Predicted numeric value; `NaN` for non-measurement events. |
+
+**Value prediction outputs**
+([`survivehr_predict_value()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict_value.md)):
+
+| Column | Description |
+|----|----|
+| `predicted_value_mean` | Predicted mean of the Gaussian distribution for the event’s numeric measurement. |
+| `predicted_value_sd` | Predicted standard deviation. |
+
+> **ODE grid**: the survival head evaluates on 1 000 equally-spaced time
+> steps from 0 to 1 in normalised time (0 to `time_scale` in raw units).
+> `eval_times` values are snapped to the nearest grid point, giving a
+> resolution of `time_scale / 999` (≈ 0.005 years with
+> `time_scale = 5.0`).
 
 ### New patients at inference
 

@@ -98,33 +98,35 @@ Static features are encoded into a flat numeric vector per patient:
 
 > **Column naming rule**: `patient_id` (or the uppercase alias
 > `PATIENT_ID`) is the only reserved name in the static table. All other
-> column names are **user-defined** — call them `SEX`, `imd`,
-> `YearOfBirth`, or anything else. The column names become the basis for
-> encoded feature names (e.g. `SEX` → `SEX_F`, `SEX_M`). This is in
-> contrast to the **events** and **targets** tables, which require fixed
-> column names (`patient_id`, `event`, `age`, `value`) — see the *Column
-> name aliases* section below for accepted uppercase alternatives. The
-> only constraint for static columns is **consistency**: the exact same
-> names must be used at pretrain, fine-tune, and predict time.
+> column names are **user-defined** — lowercase is recommended for
+> consistency (e.g. `sex`, `imd`, `year_of_birth`). The column names
+> become the basis for encoded feature names after one-hot expansion
+> (e.g. `sex` → `sex_F`, `sex_M`). This is in contrast to the **events**
+> and **targets** tables, which require fixed lowercase column names
+> (`patient_id`, `event`, `age`, `value`) — uppercase aliases are
+> accepted for backward compatibility but lowercase is the canonical
+> form. See the *Column name aliases* section below. The only constraint
+> for static columns is **consistency**: the exact same names must be
+> used at pretrain, fine-tune, and predict time.
 
 ``` r
 
 static_covariates <- data.frame(
   patient_id     = 1:3,
-  SEX            = c("M",     "F",     "M"),       # → SEX_F, SEX_M
-  ETHNICITY      = c("White", "Asian", "White"),   # → ETHNICITY_Asian, ETHNICITY_White
-  SMOKING_STATUS = c("Never", "Ex",    "Current"), # → SMOKING_STATUS_Current, ..., Never
-  IMD            = c(3L, 1L, 5L),                 # numeric, passed through
-  YEAR_OF_BIRTH  = c(1965L, 1972L, 1955L)         # numeric, passed through
+  sex            = c("M",     "F",     "M"),       # → sex_F, sex_M
+  ethnicity      = c("White", "Asian", "White"),   # → ethnicity_Asian, ethnicity_White
+  smoking_status = c("Never", "Ex",    "Current"), # → smoking_status_Current, ..., Never
+  imd            = c(3L, 1L, 5L),                 # numeric, passed through
+  year_of_birth  = c(1965L, 1972L, 1955L)         # numeric, passed through
 )
 ```
 
 The resulting static embedding for patient 1 (`M`, `White`, `Never`,
-IMD=3, YOB=1965) would be:
+imd=3, year_of_birth=1965) would be:
 
-    [SEX_F=0, SEX_M=1, ETHNICITY_Asian=0, ETHNICITY_White=1,
-     SMOKING_STATUS_Current=0, SMOKING_STATUS_Ex=0, SMOKING_STATUS_Never=1,
-     IMD=3, YEAR_OF_BIRTH=1965]
+    [sex_F=0, sex_M=1, ethnicity_Asian=0, ethnicity_White=1,
+     smoking_status_Current=0, smoking_status_Ex=0, smoking_status_Never=1,
+     imd=3, year_of_birth=1965]
 
 The **same** encoding scheme (same column order, same dummy categories)
 is derived at pre-train time and then **reused** at fine-tune and
@@ -300,6 +302,122 @@ ft2 <- survivehr_load_model(tmp)
 identical(ft2$event_vocab, ft$event_vocab)  # TRUE
 unlink(tmp)
 ```
+
+------------------------------------------------------------------------
+
+## Prediction outputs in depth
+
+### Fine-tuned models — standard columns
+
+[`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
+on a fine-tuned bundle always returns one row per patient with these
+columns per outcome:
+
+| Column | Description |
+|----|----|
+| `{outcome}_cdf_last` | Cumulative incidence at `time_scale` (end of the prediction window). |
+| `{outcome}_auc` | Area under the CDF integrated over `[0, time_scale]`. A single scalar risk score. |
+
+### Fine-tuned models — time-specific risk (`eval_times`)
+
+Pass a numeric vector of time points (in the same units as `age`) to get
+the CIF at arbitrary horizons within the prediction window:
+
+``` r
+
+# 1-, 2-, 3- and 5-year CVD / T2D risks (time_scale = 5.0)
+preds_tp <- survivehr_predict(
+  ft, pred_events, static_pop,
+  eval_times = c(1, 2, 3, 5)
+)
+# Additional columns: CVD_cdf_t1, CVD_cdf_t2, CVD_cdf_t3, CVD_cdf_t5
+#                     T2D_cdf_t1, T2D_cdf_t2, T2D_cdf_t3, T2D_cdf_t5
+```
+
+**Constraints**:
+
+- Every value must be in `(0, time_scale]`. Requesting beyond
+  `time_scale` extrapolates past the ODE integration grid and raises an
+  error.
+- Values are snapped to the nearest of the 1 000 internal grid points;
+  resolution ≈ `time_scale / 999` (about 0.005 years for a 5-year
+  window).
+
+### Pre-train models — multi-step generation
+
+[`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
+on a pre-trained bundle autoregressively samples future events.
+`max_new_tokens` controls how many steps to generate; the result is one
+row per patient per step:
+
+``` r
+
+pt_preds <- survivehr_predict(pt, events_pop, static_pop, max_new_tokens = 3)
+# Columns: patient_id, step, generated_token, generated_event,
+#          generated_age, generated_value
+```
+
+| Column | Description |
+|----|----|
+| `step` | Generation step (1 = next predicted event, 2 = one after that, …). |
+| `generated_event` | Decoded event name; `"<UNK>"` for out-of-vocabulary tokens. |
+| `generated_age` | Predicted age in raw units (de-normalised: `age_norm × time_scale`). |
+| `generated_value` | Predicted measurement value (see below); `NaN` for non-measurement events. |
+
+### Pre-train models — predicting numeric measurement values
+
+[`survivehr_predict_value()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict_value.md)
+queries the Gaussian value regression head that is trained alongside the
+survival backbone when `value_weight > 0`:
+
+``` r
+
+# Predict blood-pressure reading at next BP_CHECK
+bp_preds <- survivehr_predict_value(
+  pt,
+  events_pop[events_pop$event != "BP_CHECK", ],
+  outcome_event     = "BP_CHECK",
+  static_covariates = static_pop
+)
+# Columns: patient_id, outcome_event, predicted_value_mean, predicted_value_sd
+```
+
+The head returns `NaN` for events that never carried a non-`NA` `value`
+at pre-training time (e.g. discrete diagnoses like `"CVD"`).
+
+**Important — value scale**: the model applies no internal
+standardisation to the `value` column. The head is trained and predicts
+in whatever units you supply. For measurements on very different scales
+(e.g. BP in mmHg ~140 vs HbA1c in mmol/mol ~70) or large absolute
+values, pre-normalise before training and back-transform predictions
+afterwards:
+
+``` r
+
+# Example: z-score per event type before training
+scalers <- events_pop |>
+  dplyr::filter(!is.na(value)) |>
+  dplyr::group_by(event) |>
+  dplyr::summarise(v_mean = mean(value), v_sd = sd(value))
+
+events_scaled <- events_pop |>
+  dplyr::left_join(scalers, by = "event") |>
+  dplyr::mutate(value = dplyr::if_else(!is.na(value),
+                                        (value - v_mean) / v_sd, NA_real_)) |>
+  dplyr::select(patient_id, event, age, value)
+
+# After survivehr_predict_value(), back-transform:
+preds <- preds |>
+  dplyr::left_join(scalers, by = c("outcome_event" = "event")) |>
+  dplyr::mutate(
+    predicted_value_mean = predicted_value_mean * v_sd + v_mean,
+    predicted_value_sd   = predicted_value_sd   * v_sd
+  )
+```
+
+Fine-tuned bundles retain the backbone’s value regression head, so
+[`survivehr_predict_value()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict_value.md)
+works equally with pretrain and fine-tuned bundles.
 
 ------------------------------------------------------------------------
 

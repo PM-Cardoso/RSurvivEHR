@@ -1,5 +1,103 @@
 # Changelog
 
+## RSurvivEHR 0.8.1
+
+#### Column naming standardised to lowercase
+
+Lowercase column names are now the **canonical, preferred form** across
+all input data frames. Uppercase aliases continue to work for backward
+compatibility but are no longer showcased in examples.
+
+**Fixed/event column names** (required names or their accepted aliases):
+
+| Table   | Canonical (preferred) | Accepted alias                   |
+|---------|-----------------------|----------------------------------|
+| Events  | `patient_id`          | `PATIENT_ID`                     |
+| Events  | `event`               | `EVENT`                          |
+| Events  | `age`                 | `DAYS_SINCE_BIRTH`               |
+| Events  | `value`               | `VALUE`                          |
+| Targets | `patient_id`          | `PATIENT_ID`                     |
+| Targets | `target_event`        | `TARGET_EVENT`, `EVENT`          |
+| Targets | `target_age`          | `TARGET_AGE`, `DAYS_SINCE_BIRTH` |
+| Targets | `target_value`        | `TARGET_VALUE`, `VALUE`          |
+| Static  | `patient_id`          | `PATIENT_ID`                     |
+
+**Static covariate column names are freely chosen by the user** —
+lowercase is now recommended (e.g. `sex`, `ethnicity`, `imd`,
+`year_of_birth`) but any name is accepted.
+
+#### Documentation
+
+- `R/validate.R`: `@param` descriptions for
+  [`survivehr_validate_events()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_events.md),
+  [`survivehr_validate_static()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_static.md),
+  and
+  [`survivehr_validate_targets()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_targets.md)
+  now list lowercase as canonical and show each uppercase alias
+  explicitly.
+- `R/train.R`: `@param events` clarified; `static_pop` example updated
+  to use lowercase covariate names (`sex`, `ethnicity`, `imd`,
+  `year_of_birth`).
+- `vignettes/getting-started.Rmd`: `static_pop` example and the “Column
+  naming” callout updated to use and recommend lowercase covariate
+  names; validate output comment updated to match.
+- `vignettes/advanced-topics.Rmd`: static covariate example and “Column
+  naming rule” callout updated to use and recommend lowercase names; the
+  inline encoding output example updated accordingly.
+- `DESCRIPTION`: description updated to mention the lowercase column
+  convention and backward-compatible uppercase aliases.
+
+#### Bug fix (from 0.8.0)
+
+- Fixed
+  `IndexError: index 64 is out of bounds for dimension 1 with size 64`
+  in
+  [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
+  on pre-train models when one or more patients had a fully-packed
+  context window (`block_size` events). Root cause: the `generate()`
+  method in `causal.py` sliced `attention_mask[:, :block_size]` but
+  forgot to assign the result back, leaving the mask one column wider
+  than the trimmed token tensor after generation. Fixed with
+  `attention_mask = attention_mask[:, :block_size]`.
+
+------------------------------------------------------------------------
+
+## RSurvivEHR 0.8.0
+
+#### New features
+
+- **Multi-step pre-train predictions**
+  ([`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
+  on pre-train models): calling `max_new_tokens = n` now returns one row
+  per generated step per patient (instead of only the first step). New
+  columns: `step` (1-indexed generation step), `generated_event`,
+  `generated_age` (de-normalised by `time_scale`), `generated_value`
+  (numeric measurement or `NaN`).
+
+- **Time-specific CDF columns**
+  ([`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
+  on fine-tuned models): the new `eval_times` argument accepts a numeric
+  vector of time points in raw units (same scale as `age`). For each
+  time point `t` and each outcome, a column `{outcome}_cdf_t{t}` is
+  appended to the output. Values must be in `(0, time_scale]`.
+
+- **New function
+  [`survivehr_predict_value()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict_value.md)**:
+  predicts the numeric value (mean and SD of the model’s Gaussian output
+  head) for a specified outcome event, using either a pre-train or
+  fine-tuned model bundle. Returns a data frame with columns
+  `patient_id`, `outcome_event`, `predicted_value_mean`,
+  `predicted_value_sd`; `NaN` for events without a measurement head.
+
+#### Documentation
+
+- Updated `vignettes/getting-started.Rmd` with examples for all three
+  new features (Sections 4 and 7).
+- Expanded “Understanding the output columns” table to cover pre-train
+  and value-prediction outputs in addition to fine-tuned model outputs.
+
+------------------------------------------------------------------------
+
 ## RSurvivEHR 0.7.9
 
 - **New vignette — “Data pipeline internals”**

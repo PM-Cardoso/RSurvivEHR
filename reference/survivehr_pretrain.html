@@ -17,7 +17,7 @@ for later reuse."><link rel="preconnect" href="https://fonts.googleapis.com"><li
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.9</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -196,7 +196,7 @@ in each patient's raw sequence serves as the supervision signal.</p>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">pt</span> <span class="op">&lt;-</span> <span class="fu">survivehr_pretrain</span><span class="op">(</span><span class="va">events_pop</span>, <span class="va">static_pop</span>, <span class="va">cfg</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="co"># Vocabulary is frequency-ordered: most-common events get the smallest IDs</span></span></span>
-<span class="r-in"><span><span class="co"># e.g. &lt;PAD&gt;=0, &lt;UNK&gt;=1, HYPERTENSION=2, BP_CHECK=3, STATIN=4, T2D=5, ...</span></span></span>
+<span class="r-in"><span><span class="co"># HYPERTENSION=10, BP_CHECK=9, STATIN=9, T2D=8, METFORMIN=5, CVD=3, HBA1C=3, AMLODIPINE=1</span></span></span>
 <span class="r-in"><span><span class="va">pt</span><span class="op">$</span><span class="va">event_vocab</span></span></span>
 <span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 </code></pre></div>

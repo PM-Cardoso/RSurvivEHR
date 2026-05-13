@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.9</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -171,22 +171,26 @@ one-hot encoded automatically; numeric columns pass through
 unchanged.</p>
 <blockquote>
 <p><strong>Column naming</strong>: <code>patient_id</code> is the only
-reserved name. Every other column can be named freely — the backend
-encodes whatever it finds. By contrast, the <strong>events</strong> and
-<strong>targets</strong> tables require fixed column names
-(<code>patient_id</code>, <code>event</code>, <code>age</code>,
-<code>value</code>; and <code>patient_id</code>,
+reserved name in the static table. Every other column can be named
+freely — <strong>lowercase is recommended</strong> for consistency with
+the rest of the package. The column names become the basis for encoded
+feature names (e.g. <code>sex</code> → <code>sex_F</code>,
+<code>sex_M</code> after one-hot encoding). By contrast, the
+<strong>events</strong> and <strong>targets</strong> tables require
+fixed column names (<code>patient_id</code>, <code>event</code>,
+<code>age</code>, <code>value</code>; and <code>patient_id</code>,
 <code>target_event</code>, <code>target_age</code>,
-<code>target_value</code> respectively).</p>
+<code>target_value</code> respectively) — uppercase aliases are accepted
+for backward compatibility but lowercase is the canonical form.</p>
 </blockquote>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">static_pop</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  patient_id    <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span>,</span>
-<span>  SEX           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span><span class="op">)</span>,</span>
-<span>  ETHNICITY     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"White"</span>,<span class="st">"Asian"</span>,<span class="st">"White"</span>,<span class="st">"Black"</span>,<span class="st">"White"</span>,</span>
+<span>  sex           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span><span class="op">)</span>,</span>
+<span>  ethnicity     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"White"</span>,<span class="st">"Asian"</span>,<span class="st">"White"</span>,<span class="st">"Black"</span>,<span class="st">"White"</span>,</span>
 <span>                    <span class="st">"Asian"</span>,<span class="st">"White"</span>,<span class="st">"White"</span>,<span class="st">"Black"</span>,<span class="st">"White"</span><span class="op">)</span>,</span>
-<span>  IMD           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span>, <span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span><span class="op">)</span>,</span>
-<span>  YEAR_OF_BIRTH <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1960L</span>,<span class="fl">1970L</span>,<span class="fl">1952L</span>,<span class="fl">1975L</span>,<span class="fl">1963L</span>,<span class="fl">1958L</span>,<span class="fl">1978L</span>,<span class="fl">1960L</span>,<span class="fl">1968L</span>,<span class="fl">1975L</span><span class="op">)</span></span>
+<span>  imd           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span>, <span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span><span class="op">)</span>,</span>
+<span>  year_of_birth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1960L</span>,<span class="fl">1970L</span>,<span class="fl">1952L</span>,<span class="fl">1975L</span>,<span class="fl">1963L</span>,<span class="fl">1958L</span>,<span class="fl">1978L</span>,<span class="fl">1960L</span>,<span class="fl">1968L</span>,<span class="fl">1975L</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <blockquote>
 <p><strong>Important</strong>: always pass the <strong>same columns in
@@ -205,7 +209,7 @@ clear R error rather than a cryptic Python traceback.</p>
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/survivehr_validate_events.html">survivehr_validate_events</a></span><span class="op">(</span><span class="va">events_pop</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/survivehr_validate_static.html">survivehr_validate_static</a></span><span class="op">(</span><span class="va">static_pop</span><span class="op">)</span></span>
 <span><span class="co"># [OK] Events: 48 rows, 10 patients. Columns present, ages numeric and time-ordered.</span></span>
-<span><span class="co"># [OK] Static covariates: 10 patients, 4 covariate column(s): SEX, ETHNICITY, IMD, YEAR_OF_BIRTH.</span></span></code></pre></div>
+<span><span class="co"># [OK] Static covariates: 10 patients, 4 covariate column(s): sex, ethnicity, imd, year_of_birth.</span></span></code></pre></div>
 <hr>
 </div>
 </div>
@@ -225,7 +229,8 @@ training functions.</p>
 <span>  epochs        <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  batch_size    <span class="op">=</span> <span class="fl">4</span>,</span>
 <span>  surv_layer    <span class="op">=</span> <span class="st">"competing-risk"</span>,  <span class="co"># or "single-risk" — see Section 5</span></span>
-<span>  time_scale    <span class="op">=</span> <span class="fl">5.0</span>   <span class="co"># prediction window = 5 years (ages are in years)</span></span>
+<span>  time_scale    <span class="op">=</span> <span class="fl">5.0</span>,  <span class="co"># prediction window = 5 years (ages are in years)</span></span>
+<span>  value_weight  <span class="op">=</span> <span class="fl">0.1</span>   <span class="co"># weight for value regression loss (0 = disabled)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Key parameters:</p>
 <table class="table">
@@ -296,6 +301,64 @@ different outcome definitions without re-training from scratch.</p>
 <span></span>
 <span><span class="co"># Reload at any time — vocabulary, time_scale, and token policy are all preserved</span></span>
 <span><span class="va">pt_model</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_load_model.html">survivehr_load_model</a></span><span class="op">(</span><span class="st">"pretrain_backbone.pt"</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="pre-train-predictions-multi-step-next-events">Pre-train predictions — multi-step next events<a class="anchor" aria-label="anchor" href="#pre-train-predictions-multi-step-next-events"></a>
+</h3>
+<p>The pretrain model autoregressively generates future events for each
+patient. Set <code>max_new_tokens</code> to control how many steps ahead
+to predict. Each generated step is returned as a separate row with a
+<code>step</code> column, so a <code>max_new_tokens = 3</code> call
+gives up to 3 rows per patient.</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Generate the next 3 predicted events for every patient</span></span>
+<span><span class="va">pt_preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_predict.html">survivehr_predict</a></span><span class="op">(</span><span class="va">pt_model</span>, <span class="va">events_pop</span>, <span class="va">static_pop</span>, max_new_tokens <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">pt_preds</span><span class="op">)</span></span>
+<span><span class="co"># Columns: patient_id, step, generated_token, generated_event, generated_age,</span></span>
+<span><span class="co">#          generated_value</span></span>
+<span><span class="co">#</span></span>
+<span><span class="co"># step            : 1 = next event, 2 = event after that, 3 = third predicted event</span></span>
+<span><span class="co"># generated_event : decoded event name (e.g. "HYPERTENSION", "&lt;UNK&gt;")</span></span>
+<span><span class="co"># generated_age   : predicted age in the same units as the input age column</span></span>
+<span><span class="co"># generated_value : predicted numeric value (NaN for non-measurement events)</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="pre-train-predictions-predicted-measurement-value">Pre-train predictions — predicted measurement value<a class="anchor" aria-label="anchor" href="#pre-train-predictions-predicted-measurement-value"></a>
+</h3>
+<p><code><a href="../reference/survivehr_predict_value.html">survivehr_predict_value()</a></code> queries the backbone’s
+Gaussian regression head to predict the numeric value that would be
+recorded alongside a specific clinical event. For example,
+<code>"BP_CHECK"</code> carries a blood-pressure reading in
+<code>value</code>; the model learns to predict that reading from the
+patient’s history.</p>
+<p>Remove the event you are querying from the context first (same
+leakage-free logic as fine-tuning).</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Predict the blood pressure reading at the next BP_CHECK for each patient</span></span>
+<span><span class="va">bp_preds</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_predict_value.html">survivehr_predict_value</a></span><span class="op">(</span><span class="va">pt_model</span>, <span class="va">events_pop</span>, <span class="st">"BP_CHECK"</span>, <span class="va">static_pop</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">bp_preds</span><span class="op">)</span></span>
+<span><span class="co"># Columns: patient_id, outcome_event, predicted_value_mean, predicted_value_sd</span></span>
+<span><span class="co">#</span></span>
+<span><span class="co"># predicted_value_mean : mean of the Gaussian distribution</span></span>
+<span><span class="co"># predicted_value_sd   : standard deviation of the Gaussian distribution</span></span>
+<span><span class="co"># NaN is returned for events that never had a numeric value at pre-training</span></span>
+<span><span class="co"># time (e.g. "CVD", which is a discrete diagnosis with no value).</span></span></code></pre></div>
+<blockquote>
+<p><strong>When are predictions meaningful?</strong> Only events that
+appeared with non-<code>NA</code> <code>value</code> entries at
+pre-training time will return non-NaN predictions. In this vignette,
+<code>BP_CHECK</code>, <code>HBA1C</code> are the only such events. All
+others return <code>NaN</code>.</p>
+</blockquote>
+<blockquote>
+<p><strong>Value scale</strong>: the model stores and predicts values in
+exactly the units you supply — no internal standardisation is applied.
+When different event types carry measurements on very different scales
+(e.g. BP ~140 mmHg vs HbA1c ~70 mmol/mol), pre-normalise the
+<code>value</code> column before training and back-transform predictions
+afterwards. See the <em>Advanced topics</em> vignette for a worked
+example.</p>
+</blockquote>
 <hr>
 </div>
 </div>
@@ -319,7 +382,7 @@ time.</li>
 <code>target_age</code>, define <code>targets</code>
 <strong>before</strong> filtering the context.</p>
 <p>We use <strong>patients 1–6</strong> as the fine-tuning cohort.</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">ft_static</span> <span class="op">&lt;-</span> <span class="va">static_pop</span><span class="op">[</span><span class="va">static_pop</span><span class="op">$</span><span class="va">patient_id</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="op">]</span></span>
 <span><span class="fu"><a href="../reference/survivehr_validate_static.html">survivehr_validate_static</a></span><span class="op">(</span><span class="va">ft_static</span><span class="op">)</span></span>
 <span><span class="co"># [OK] Static covariates: 6 patients, 4 covariate column(s): SEX, ETHNICITY, IMD, YEAR_OF_BIRTH.</span></span></code></pre></div>
@@ -378,7 +441,7 @@ event)</td>
 </table>
 <p>Both outcome codes are removed from the context so neither leaks into
 the input features.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># 1. Define targets first — the outcome age is needed to cut off the context</span></span>
 <span><span class="va">targets_cr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  patient_id   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1L</span>,    <span class="fl">2L</span>,    <span class="fl">3L</span>,    <span class="fl">4L</span>,    <span class="fl">5L</span>,    <span class="fl">6L</span><span class="op">)</span>,</span>
@@ -423,7 +486,7 @@ the input features.</p>
 endpoint of interest and no competing events need to be modelled
 explicitly. Here we model <strong>CVD only</strong>: patients 1–3 are
 CVD cases; patients 4–6 are right-censored controls.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># 1. Define targets first</span></span>
 <span><span class="va">targets_sr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  patient_id   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1L</span>,    <span class="fl">2L</span>,    <span class="fl">3L</span>,     <span class="fl">4L</span>,          <span class="fl">5L</span>,       <span class="fl">6L</span><span class="op">)</span>,</span>
@@ -488,7 +551,7 @@ first event).</td>
 <div class="section level2">
 <h2 id="save-and-load-fine-tuned-models">6 Save and load fine-tuned models<a class="anchor" aria-label="anchor" href="#save-and-load-fine-tuned-models"></a>
 </h2>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/survivehr_save_model.html">survivehr_save_model</a></span><span class="op">(</span><span class="va">ft_cr</span>, <span class="st">"model_cr.pt"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/survivehr_save_model.html">survivehr_save_model</a></span><span class="op">(</span><span class="va">ft_sr</span>, <span class="st">"model_sr.pt"</span><span class="op">)</span></span>
 <span></span>
@@ -513,7 +576,7 @@ for patients with a known outcome (p1–p6) this is their
 <code>target_age</code>; for held-out patients (p7–p10) this is their
 last recorded event age.</li>
 </ol>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Prediction ages: target_age for p1-6 (from targets_cr / targets_sr),</span></span>
 <span><span class="co"># last recorded event age for p7-10.</span></span>
 <span><span class="va">pred_ages_cr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
@@ -551,8 +614,45 @@ last recorded event age.</li>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">preds_sr</span><span class="op">)</span></span>
 <span><span class="co"># Columns: patient_id, CVD_cdf_last, CVD_auc</span></span></code></pre></div>
 <div class="section level3">
+<h3 id="a-risk-at-specific-time-points">7a Risk at specific time points<a class="anchor" aria-label="anchor" href="#a-risk-at-specific-time-points"></a>
+</h3>
+<p>The <code>eval_times</code> argument returns the cumulative incidence
+at any set of time points within the prediction window
+<code>(0, time_scale]</code>. With <code>time_scale = 5.0</code>
+(years), valid <code>eval_times</code> are any positive values up to and
+including 5.</p>
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># 1-year, 2-year, 3-year and 5-year (= full horizon) CVD risk</span></span>
+<span><span class="va">preds_cr_tp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_predict.html">survivehr_predict</a></span><span class="op">(</span></span>
+<span>  <span class="va">ft_cr2</span>, <span class="va">pred_events_cr</span>, <span class="va">static_pop</span>,</span>
+<span>  eval_times <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span>, <span class="fl">5</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">preds_cr_tp</span><span class="op">)</span></span>
+<span><span class="co"># New columns alongside _cdf_last and _auc:</span></span>
+<span><span class="co">#   CVD_cdf_t1   — cumulative CVD risk at 1 year</span></span>
+<span><span class="co">#   CVD_cdf_t2   — cumulative CVD risk at 2 years</span></span>
+<span><span class="co">#   CVD_cdf_t3   — cumulative CVD risk at 3 years</span></span>
+<span><span class="co">#   CVD_cdf_t5   — cumulative CVD risk at 5 years (≈ CVD_cdf_last)</span></span>
+<span><span class="co">#   T2D_cdf_t1   — cumulative T2D risk at 1 year  (competing-risk model)</span></span>
+<span><span class="co">#   ... etc.</span></span></code></pre></div>
+<blockquote>
+<p><strong>Boundary rule</strong>: every value in
+<code>eval_times</code> must be in <code>(0, time_scale]</code>.
+Requesting a time point beyond the prediction window the model was
+trained on (e.g. <code>eval_times = 10</code> with
+<code>time_scale = 5</code>) raises an error because the ODE grid does
+not extend past the trained horizon. The internal survival ODE evaluates
+on a fixed normalised grid of 1 000 equally-spaced steps from 0 to 1
+(mapped back to <code>[0, time_scale]</code> in raw units);
+<code>eval_times</code> values are snapped to the nearest grid
+point.</p>
+</blockquote>
+</div>
+<div class="section level3">
 <h3 id="understanding-the-output-columns">Understanding the output columns<a class="anchor" aria-label="anchor" href="#understanding-the-output-columns"></a>
 </h3>
+<p><strong>Fine-tuned model outputs</strong>
+(<code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code>):</p>
 <table class="table">
 <colgroup>
 <col width="50%">
@@ -566,29 +666,89 @@ last recorded event age.</li>
 <tr class="odd">
 <td><code>{outcome}_cdf_last</code></td>
 <td>Cumulative incidence at the <strong>end</strong> of the prediction
-window. The window spans <code>[0, time_scale]</code> in the same units
-as <code>age</code>. With <code>time_scale = 5.0</code> (as used in this
-vignette), this is the estimated probability that the outcome occurs
-within the <strong>next 5 years</strong> from the patient’s last
-recorded event.</td>
+window. With <code>time_scale = 5.0</code> this is the estimated 5-year
+risk from the patient’s last recorded event.</td>
 </tr>
 <tr class="even">
 <td><code>{outcome}_auc</code></td>
 <td>
 <strong>Area under the CDF</strong> integrated across the full
-prediction window. This is the average cumulative risk from time 0 to
-<code>time_scale</code>. Values closer to 1 indicate higher overall
-risk; values closer to 0 indicate lower risk. Use <code>auc</code> when
-you want a single scalar risk score for ranking patients.</td>
+window. A single scalar risk score; values closer to 1 indicate higher
+overall risk.</td>
+</tr>
+<tr class="odd">
+<td><code>{outcome}_cdf_t{X}</code></td>
+<td>
+<em>(Only when <code>eval_times</code> is supplied.)</em> Cumulative
+incidence at time <code>X</code> in the same units as <code>age</code>,
+e.g. <code>CVD_cdf_t1</code> for 1-year CVD risk.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pre-train model outputs</strong>
+(<code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code>):</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr class="header">
+<th>Column</th>
+<th>Description</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>step</code></td>
+<td>Generation step index (1 = next event, 2 = event after that,
+…).</td>
+</tr>
+<tr class="even">
+<td><code>generated_event</code></td>
+<td>Decoded event name; <code>"&lt;UNK&gt;"</code> for out-of-vocabulary
+events.</td>
+</tr>
+<tr class="odd">
+<td><code>generated_age</code></td>
+<td>Predicted event age in raw units (de-normalised by
+<code>time_scale</code>).</td>
+</tr>
+<tr class="even">
+<td><code>generated_value</code></td>
+<td>Predicted numeric value; <code>NaN</code> for non-measurement
+events.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Value prediction outputs</strong>
+(<code><a href="../reference/survivehr_predict_value.html">survivehr_predict_value()</a></code>):</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr class="header">
+<th>Column</th>
+<th>Description</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>predicted_value_mean</code></td>
+<td>Predicted mean of the Gaussian distribution for the event’s numeric
+measurement.</td>
+</tr>
+<tr class="even">
+<td><code>predicted_value_sd</code></td>
+<td>Predicted standard deviation.</td>
 </tr>
 </tbody>
 </table>
 <blockquote>
-<p><strong>Prediction window</strong>: internally, the survival ODE
-evaluates the CDF on a fixed grid of 1 000 equally-spaced time steps
-from 0 to 1 in <em>normalised</em> time. Normalised time 1.0 corresponds
-to <code>time_scale</code> in raw units. The grid is set at model
-architecture level (not a user parameter).</p>
+<p><strong>ODE grid</strong>: the survival head evaluates on 1 000
+equally-spaced time steps from 0 to 1 in normalised time (0 to
+<code>time_scale</code> in raw units). <code>eval_times</code> values
+are snapped to the nearest grid point, giving a resolution of
+<code>time_scale / 999</code> (≈ 0.005 years with
+<code>time_scale = 5.0</code>).</p>
 </blockquote>
 </div>
 <div class="section level3">
@@ -598,7 +758,7 @@ architecture level (not a user parameter).</p>
 training time. The model stores the exact encoded column list (including
 one-hot expanded categories) and raises a clear error rather than
 silently producing wrong predictions if there is a mismatch.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">new_events</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  patient_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">99</span>, <span class="fl">99</span>, <span class="fl">99</span>, <span class="fl">99</span><span class="op">)</span>,</span>
 <span>  event      <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"HYPERTENSION"</span>, <span class="st">"BP_CHECK"</span>, <span class="st">"METFORMIN"</span>, <span class="st">"ASPIRIN"</span><span class="op">)</span>,  <span class="co"># ASPIRIN → &lt;UNK&gt;</span></span>
