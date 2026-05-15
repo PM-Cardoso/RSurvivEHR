@@ -171,8 +171,8 @@ cfg <- survivehr_config(
   epochs        = 10,
   batch_size    = 4,
   surv_layer    = "competing-risk",  # or "single-risk" — see Section 5
-  time_scale    = 5.0,  # prediction window = 5 years (ages are in years)
-  value_weight  = 0.1   # weight for value regression loss (0 = disabled)
+  value_weight  = 0.1,  # weight for value regression loss (0 = disabled)
+  time_scale    = 5.0   # prediction window = 5 years (ages are in years)
 )
 ```
 
@@ -299,7 +299,7 @@ We use **patients 1–6** as the fine-tuning cohort.
 
 ft_static <- static_pop[static_pop$patient_id %in% 1:6, ]
 survivehr_validate_static(ft_static)
-# [OK] Static covariates: 6 patients, 4 covariate column(s): SEX, ETHNICITY, IMD, YEAR_OF_BIRTH.
+# [OK] Static covariates: 6 patients, 4 covariate column(s): sex, ethnicity, imd, year_of_birth.
 ```
 
 ### 5a Competing-risk fine-tuning
@@ -567,13 +567,13 @@ new_events <- data.frame(
   value      = c(NA,    158,        NA,           NA)
 )
 
-# Must include the same columns as static_pop: SEX, ETHNICITY, IMD, YEAR_OF_BIRTH
+# Must include the same columns as static_pop: sex, ethnicity, imd, year_of_birth
 new_static <- data.frame(
   patient_id    = 99,
-  SEX           = "M",
-  ETHNICITY     = "White",
-  IMD           = 2L,
-  YEAR_OF_BIRTH = 1963L
+  sex           = "M",
+  ethnicity     = "White",
+  imd           = 2L,
+  year_of_birth = 1963L
 )
 
 pred_new <- survivehr_predict(ft_cr2, new_events, new_static)
@@ -583,12 +583,14 @@ print(pred_new)
 See the [Model
 architecture](https://pm-cardoso.github.io/RSurvivEHR/articles/model-architecture.md)
 article for the full configuration reference and the official Gadd et
-al. 2025 hyperparameter table.
+al. (2026) hyperparameter table.
 
 ------------------------------------------------------------------------
 
 ## References
 
-Gadd, C. et al. (2025). *SurvivEHR: Transformer-based survival analysis
-on electronic health records*. medRxiv.
-[doi:10.1101/2025.08.04.25332916](https://doi.org/10.1101/2025.08.04.25332916)
+Gadd, C., Gokhale, K., Acharya, A. et al. (2026). *SurvivEHR: a
+competing risks, time-to-event foundation model for multiple long-term
+conditions from primary care electronic health records*. npj Digital
+Medicine.
+[doi:10.1038/s41746-026-02709-z](https://doi.org/10.1038/s41746-026-02709-z)

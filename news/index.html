@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,6 +38,51 @@
       <small>Source: <a href="https://github.com/PM-Cardoso/RSurvivEHR/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.8.2" id="rsurvivehr-082">RSurvivEHR 0.8.2<a class="anchor" aria-label="anchor" href="#rsurvivehr-082"></a></h2>
+<div class="section level4">
+<h4 id="vignette-rewrite--model-architecture-and-parameter-reference-0-8-2">Vignette rewrite — model architecture and parameter reference<a class="anchor" aria-label="anchor" href="#vignette-rewrite--model-architecture-and-parameter-reference-0-8-2"></a></h4>
+<p><code>vignettes/model-architecture.Rmd</code> has been fully rewritten:</p>
+<ul><li>
+<strong>Accurate documentation</strong>: removed incorrect claims that had been introduced in earlier drafts — no context-window deduplication in the backend, no learning-rate scheduler, and no early stopping are implemented; the single <code>AdamW</code> optimiser is now clearly described.</li>
+<li>
+<strong>New structure</strong>: navigable jump links at the top; “How the model works” section with architecture diagram; “Quick-start configurations” with annotated code blocks for laptop / workstation / HPC; upstream hyperparameter comparison table with clickable anchors; full <code><a href="../reference/survivehr_config.html">survivehr_config()</a></code> annotated code block; per-parameter sections grouped by theme (architecture, regularisation, optimisation, loss weights, tokenisation, time &amp; age, hardware); fine-tuning notes table; references.</li>
+<li>
+<strong>All 15 <code><a href="../reference/survivehr_config.html">survivehr_config()</a></code> parameters</strong> now covered with default and upstream comparison values, including <code>dropout</code>, <code>time_scale</code>, and <code>value_weight</code> which were previously missing from the comparison table.</li>
+<li>
+<strong><code>time_scale</code> table</strong> extended to show desired-window guidance (1-year vs 5-year windows for both year-based and day-based age columns).</li>
+</ul></div>
+<div class="section level4">
+<h4 id="documentation-fixes-this-release-0-8-2">Documentation fixes (this release)<a class="anchor" aria-label="anchor" href="#documentation-fixes-this-release-0-8-2"></a></h4>
+<ul><li>
+<code>vignettes/advanced-topics.Rmd</code>: <code>static_pop</code> worked example now uses lowercase column names (<code>sex</code>, <code>ethnicity</code>, <code>imd</code>, <code>year_of_birth</code>).</li>
+<li>
+<code>vignettes/getting-started.Rmd</code>: <code>time_scale</code> and <code>value_weight</code> argument order in the main <code>cfg</code> block corrected to match canonical parameter order.</li>
+</ul></div>
+<div class="section level4">
+<h4 id="citation-update--paper-published-in-npj-digital-medicine-0-8-2">Citation update — paper published in <em>npj Digital Medicine</em> (2026)<a class="anchor" aria-label="anchor" href="#citation-update--paper-published-in-npj-digital-medicine-0-8-2"></a></h4>
+<p>The SurvivEHR paper has been published:</p>
+<blockquote>
+<p>Gadd, C., Gokhale, K., Acharya, A. et al. (2026). <em>SurvivEHR: a competing risks, time-to-event foundation model for multiple long-term conditions from primary care electronic health records</em>. npj Digital Medicine. <a href="doi:10.1038/s41746-026-02709-z" class="uri">doi:10.1038/s41746-026-02709-z</a></p>
+</blockquote>
+<p>All citations updated from the medRxiv preprint (2025, <a href="doi:10.1101/2025.08.04.25332916" class="uri">doi:10.1101/2025.08.04.25332916</a>) to the published journal article throughout:</p>
+<ul><li>
+<code>README.md</code> — citation block.</li>
+<li>
+<code>vignettes/getting-started.Rmd</code> — References section and “Gadd et al. 2025” inline reference.</li>
+<li>
+<code>vignettes/model-architecture.Rmd</code> — section heading “Upstream hyperparameters”, introductory sentence, and References block.</li>
+<li>
+<code>R/config.R</code> — <code>@description</code> Roxygen comment.</li>
+</ul></div>
+<div class="section level4">
+<h4 id="documentation-fixes-0-8-2">Documentation fixes<a class="anchor" aria-label="anchor" href="#documentation-fixes-0-8-2"></a></h4>
+<ul><li>
+<code>vignettes/data-pipeline.Rmd</code>: <code>static_pop</code> example and Step 6 table now use lowercase column names (<code>sex</code>, <code>ethnicity</code>, <code>imd</code>, <code>year_of_birth</code>) consistent with the lowercase-first convention adopted in 0.8.1.</li>
+<li>
+<code>vignettes/getting-started.Rmd</code>: <code>new_static</code> inference example now uses lowercase column names (<code>sex</code>, <code>ethnicity</code>, <code>imd</code>, <code>year_of_birth</code>).</li>
+</ul><hr></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.8.1" id="rsurvivehr-081">RSurvivEHR 0.8.1<a class="anchor" aria-label="anchor" href="#rsurvivehr-081"></a></h2>
 <div class="section level4">

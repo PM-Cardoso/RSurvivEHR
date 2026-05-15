@@ -29,7 +29,7 @@
 
     <a class="navbar-brand me-2" href="index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -141,7 +141,7 @@ new events ────────▶ survivehr_predict()  ──▶ per-patien
 <li>
 <strong><code>events</code></strong> and <strong><code>targets</code></strong> use fixed column names (<code>patient_id</code>, <code>event</code>, <code>age</code>, <code>value</code>; and <code>patient_id</code>, <code>target_event</code>, <code>target_age</code>, <code>target_value</code> respectively). Uppercase alternatives (<code>PATIENT_ID</code>, <code>EVENT</code>, <code>DAYS_SINCE_BIRTH</code>) are also accepted.</li>
 <li>
-<strong><code>static_covariates</code></strong> column names are fully user-defined — use whatever your data has (<code>SEX</code>, <code>IMD</code>, <code>year_of_birth</code>, …). Categorical columns are one-hot encoded automatically; numeric columns pass through unchanged.</li>
+<strong><code>static_covariates</code></strong> column names are fully user-defined — use whatever your data has (<code>sex</code>, <code>imd</code>, <code>year_of_birth</code>, …). Categorical columns are one-hot encoded automatically; numeric columns pass through unchanged.</li>
 <li>Continuous readings (blood pressure, HbA1c, BMI, etc.) go in the <code>value</code> column alongside the event that recorded them. Rows without a reading should be <code>NA</code>.</li>
 </ul>
 <hr>
@@ -228,7 +228,7 @@ new events ────────▶ survivehr_predict()  ──▶ per-patien
 </h2>
 <p>If you use RSurvivEHR in your research, please cite the original SurvivEHR paper:</p>
 <blockquote>
-<p>Gadd, C. et al. (2025). <em>SurvivEHR: Transformer-based survival analysis on electronic health records</em>. medRxiv. <a href="https://doi.org/10.1101/2025.08.04.25332916" target="_blank" rel="noopener noreferrer" class="external-link">doi:10.1101/2025.08.04.25332916</a></p>
+<p>Gadd, C., Gokhale, K., Acharya, A. et al. (2026). <em>SurvivEHR: a competing risks, time-to-event foundation model for multiple long-term conditions from primary care electronic health records</em>. npj Digital Medicine. <a href="https://doi.org/10.1038/s41746-026-02709-z" target="_blank" rel="noopener noreferrer" class="external-link">doi:10.1038/s41746-026-02709-z</a></p>
 </blockquote>
 </div>
 </div>

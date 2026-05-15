@@ -1,5 +1,73 @@
 # Changelog
 
+## RSurvivEHR 0.8.2
+
+#### Vignette rewrite — model architecture and parameter reference
+
+`vignettes/model-architecture.Rmd` has been fully rewritten:
+
+- **Accurate documentation**: removed incorrect claims that had been
+  introduced in earlier drafts — no context-window deduplication in the
+  backend, no learning-rate scheduler, and no early stopping are
+  implemented; the single `AdamW` optimiser is now clearly described.
+- **New structure**: navigable jump links at the top; “How the model
+  works” section with architecture diagram; “Quick-start configurations”
+  with annotated code blocks for laptop / workstation / HPC; upstream
+  hyperparameter comparison table with clickable anchors; full
+  [`survivehr_config()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_config.md)
+  annotated code block; per-parameter sections grouped by theme
+  (architecture, regularisation, optimisation, loss weights,
+  tokenisation, time & age, hardware); fine-tuning notes table;
+  references.
+- **All 15
+  [`survivehr_config()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_config.md)
+  parameters** now covered with default and upstream comparison values,
+  including `dropout`, `time_scale`, and `value_weight` which were
+  previously missing from the comparison table.
+- **`time_scale` table** extended to show desired-window guidance
+  (1-year vs 5-year windows for both year-based and day-based age
+  columns).
+
+#### Documentation fixes (this release)
+
+- `vignettes/advanced-topics.Rmd`: `static_pop` worked example now uses
+  lowercase column names (`sex`, `ethnicity`, `imd`, `year_of_birth`).
+- `vignettes/getting-started.Rmd`: `time_scale` and `value_weight`
+  argument order in the main `cfg` block corrected to match canonical
+  parameter order.
+
+#### Citation update — paper published in *npj Digital Medicine* (2026)
+
+The SurvivEHR paper has been published:
+
+> Gadd, C., Gokhale, K., Acharya, A. et al. (2026). *SurvivEHR: a
+> competing risks, time-to-event foundation model for multiple long-term
+> conditions from primary care electronic health records*. npj Digital
+> Medicine. <doi:10.1038/s41746-026-02709-z>
+
+All citations updated from the medRxiv preprint (2025,
+<doi:10.1101/2025.08.04.25332916>) to the published journal article
+throughout:
+
+- `README.md` — citation block.
+- `vignettes/getting-started.Rmd` — References section and “Gadd et
+  al. 2025” inline reference.
+- `vignettes/model-architecture.Rmd` — section heading “Upstream
+  hyperparameters”, introductory sentence, and References block.
+- `R/config.R` — `@description` Roxygen comment.
+
+#### Documentation fixes
+
+- `vignettes/data-pipeline.Rmd`: `static_pop` example and Step 6 table
+  now use lowercase column names (`sex`, `ethnicity`, `imd`,
+  `year_of_birth`) consistent with the lowercase-first convention
+  adopted in 0.8.1.
+- `vignettes/getting-started.Rmd`: `new_static` inference example now
+  uses lowercase column names (`sex`, `ethnicity`, `imd`,
+  `year_of_birth`).
+
+------------------------------------------------------------------------
+
 ## RSurvivEHR 0.8.1
 
 #### Column naming standardised to lowercase

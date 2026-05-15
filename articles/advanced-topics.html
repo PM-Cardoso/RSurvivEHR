@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -368,11 +368,11 @@ context filtering, and the competing-risk fine-tune on two outcomes.</p>
 <span></span>
 <span><span class="va">static_pop</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  patient_id    <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span>,</span>
-<span>  SEX           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span><span class="op">)</span>,</span>
-<span>  ETHNICITY     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"White"</span>,<span class="st">"Asian"</span>,<span class="st">"White"</span>,<span class="st">"Black"</span>,<span class="st">"White"</span>,</span>
+<span>  sex           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span><span class="op">)</span>,</span>
+<span>  ethnicity     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"White"</span>,<span class="st">"Asian"</span>,<span class="st">"White"</span>,<span class="st">"Black"</span>,<span class="st">"White"</span>,</span>
 <span>                    <span class="st">"Asian"</span>,<span class="st">"White"</span>,<span class="st">"White"</span>,<span class="st">"Black"</span>,<span class="st">"White"</span><span class="op">)</span>,</span>
-<span>  IMD           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span>, <span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span><span class="op">)</span>,</span>
-<span>  YEAR_OF_BIRTH <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1960L</span>,<span class="fl">1970L</span>,<span class="fl">1952L</span>,<span class="fl">1975L</span>,<span class="fl">1963L</span>,<span class="fl">1958L</span>,<span class="fl">1978L</span>,<span class="fl">1960L</span>,<span class="fl">1968L</span>,<span class="fl">1975L</span><span class="op">)</span></span>
+<span>  imd           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span>, <span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span><span class="op">)</span>,</span>
+<span>  year_of_birth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1960L</span>,<span class="fl">1970L</span>,<span class="fl">1952L</span>,<span class="fl">1975L</span>,<span class="fl">1963L</span>,<span class="fl">1958L</span>,<span class="fl">1978L</span>,<span class="fl">1960L</span>,<span class="fl">1968L</span>,<span class="fl">1975L</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># ── 2. Config ─────────────────────────────────────────────────────────────────</span></span>

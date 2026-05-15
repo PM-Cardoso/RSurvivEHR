@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -126,11 +126,11 @@ the <a href="getting-started.html">Getting started</a> vignette.</p>
 <span></span>
 <span><span class="va">static_pop</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  patient_id    <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span>,</span>
-<span>  SEX           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span><span class="op">)</span>,</span>
-<span>  ETHNICITY     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"White"</span>,<span class="st">"Asian"</span>,<span class="st">"White"</span>,<span class="st">"Black"</span>,<span class="st">"White"</span>,</span>
+<span>  sex           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span>,<span class="st">"M"</span>,<span class="st">"F"</span><span class="op">)</span>,</span>
+<span>  ethnicity     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"White"</span>,<span class="st">"Asian"</span>,<span class="st">"White"</span>,<span class="st">"Black"</span>,<span class="st">"White"</span>,</span>
 <span>                    <span class="st">"Asian"</span>,<span class="st">"White"</span>,<span class="st">"White"</span>,<span class="st">"Black"</span>,<span class="st">"White"</span><span class="op">)</span>,</span>
-<span>  IMD           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span>, <span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span><span class="op">)</span>,</span>
-<span>  YEAR_OF_BIRTH <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1960L</span>,<span class="fl">1970L</span>,<span class="fl">1952L</span>,<span class="fl">1975L</span>,<span class="fl">1963L</span>,<span class="fl">1958L</span>,<span class="fl">1978L</span>,<span class="fl">1960L</span>,<span class="fl">1968L</span>,<span class="fl">1975L</span><span class="op">)</span></span>
+<span>  imd           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span>, <span class="fl">3L</span>, <span class="fl">1L</span>, <span class="fl">5L</span>, <span class="fl">2L</span>, <span class="fl">4L</span><span class="op">)</span>,</span>
+<span>  year_of_birth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1960L</span>,<span class="fl">1970L</span>,<span class="fl">1952L</span>,<span class="fl">1975L</span>,<span class="fl">1963L</span>,<span class="fl">1958L</span>,<span class="fl">1978L</span>,<span class="fl">1960L</span>,<span class="fl">1968L</span>,<span class="fl">1975L</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <hr>
 </div>
@@ -358,12 +358,12 @@ dataclass.</p>
 <p>Static covariates are encoded into a float32 matrix:</p>
 <ul>
 <li>
-<strong>Numeric columns</strong> (<code>IMD</code>,
-<code>YEAR_OF_BIRTH</code>): passed through as-is; <code>NaN</code>
+<strong>Numeric columns</strong> (<code>imd</code>,
+<code>year_of_birth</code>): passed through as-is; <code>NaN</code>
 filled with <code>0.0</code>.</li>
 <li>
-<strong>Categorical columns</strong> (<code>SEX</code>,
-<code>ETHNICITY</code>): one-hot encoded with
+<strong>Categorical columns</strong> (<code>sex</code>,
+<code>ethnicity</code>): one-hot encoded with
 <code>pd.get_dummies</code>.</li>
 </ul>
 <p>For <code>static_pop</code>:</p>
@@ -380,31 +380,31 @@ filled with <code>0.0</code>.</li>
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td>SEX</td>
+<td>sex</td>
 <td>“M” / “F”</td>
 <td>
-<code>SEX_F</code>, <code>SEX_M</code>
+<code>sex_F</code>, <code>sex_M</code>
 </td>
 </tr>
 <tr class="even">
-<td>ETHNICITY</td>
+<td>ethnicity</td>
 <td>“White” / “Asian” / “Black”</td>
 <td>
-<code>ETHNICITY_Asian</code>, <code>ETHNICITY_Black</code>,
-<code>ETHNICITY_White</code>
+<code>ethnicity_Asian</code>, <code>ethnicity_Black</code>,
+<code>ethnicity_White</code>
 </td>
 </tr>
 <tr class="odd">
-<td>IMD</td>
+<td>imd</td>
 <td>1–5 (integer)</td>
 <td>
-<code>IMD</code> (numeric, kept as-is)</td>
+<code>imd</code> (numeric, kept as-is)</td>
 </tr>
 <tr class="even">
-<td>YEAR_OF_BIRTH</td>
+<td>year_of_birth</td>
 <td>1952–1978</td>
 <td>
-<code>YEAR_OF_BIRTH</code> (numeric)</td>
+<code>year_of_birth</code> (numeric)</td>
 </tr>
 </tbody>
 </table>

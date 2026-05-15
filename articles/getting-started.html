@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -229,8 +229,8 @@ training functions.</p>
 <span>  epochs        <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  batch_size    <span class="op">=</span> <span class="fl">4</span>,</span>
 <span>  surv_layer    <span class="op">=</span> <span class="st">"competing-risk"</span>,  <span class="co"># or "single-risk" — see Section 5</span></span>
-<span>  time_scale    <span class="op">=</span> <span class="fl">5.0</span>,  <span class="co"># prediction window = 5 years (ages are in years)</span></span>
-<span>  value_weight  <span class="op">=</span> <span class="fl">0.1</span>   <span class="co"># weight for value regression loss (0 = disabled)</span></span>
+<span>  value_weight  <span class="op">=</span> <span class="fl">0.1</span>,  <span class="co"># weight for value regression loss (0 = disabled)</span></span>
+<span>  time_scale    <span class="op">=</span> <span class="fl">5.0</span>   <span class="co"># prediction window = 5 years (ages are in years)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Key parameters:</p>
 <table class="table">
@@ -385,7 +385,7 @@ time.</li>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">ft_static</span> <span class="op">&lt;-</span> <span class="va">static_pop</span><span class="op">[</span><span class="va">static_pop</span><span class="op">$</span><span class="va">patient_id</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="op">]</span></span>
 <span><span class="fu"><a href="../reference/survivehr_validate_static.html">survivehr_validate_static</a></span><span class="op">(</span><span class="va">ft_static</span><span class="op">)</span></span>
-<span><span class="co"># [OK] Static covariates: 6 patients, 4 covariate column(s): SEX, ETHNICITY, IMD, YEAR_OF_BIRTH.</span></span></code></pre></div>
+<span><span class="co"># [OK] Static covariates: 6 patients, 4 covariate column(s): sex, ethnicity, imd, year_of_birth.</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="a-competing-risk-fine-tuning">5a Competing-risk fine-tuning<a class="anchor" aria-label="anchor" href="#a-competing-risk-fine-tuning"></a>
 </h3>
@@ -766,29 +766,31 @@ silently producing wrong predictions if there is a mismatch.</p>
 <span>  value      <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="cn">NA</span>,    <span class="fl">158</span>,        <span class="cn">NA</span>,           <span class="cn">NA</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Must include the same columns as static_pop: SEX, ETHNICITY, IMD, YEAR_OF_BIRTH</span></span>
+<span><span class="co"># Must include the same columns as static_pop: sex, ethnicity, imd, year_of_birth</span></span>
 <span><span class="va">new_static</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  patient_id    <span class="op">=</span> <span class="fl">99</span>,</span>
-<span>  SEX           <span class="op">=</span> <span class="st">"M"</span>,</span>
-<span>  ETHNICITY     <span class="op">=</span> <span class="st">"White"</span>,</span>
-<span>  IMD           <span class="op">=</span> <span class="fl">2L</span>,</span>
-<span>  YEAR_OF_BIRTH <span class="op">=</span> <span class="fl">1963L</span></span>
+<span>  sex           <span class="op">=</span> <span class="st">"M"</span>,</span>
+<span>  ethnicity     <span class="op">=</span> <span class="st">"White"</span>,</span>
+<span>  imd           <span class="op">=</span> <span class="fl">2L</span>,</span>
+<span>  year_of_birth <span class="op">=</span> <span class="fl">1963L</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">pred_new</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_predict.html">survivehr_predict</a></span><span class="op">(</span><span class="va">ft_cr2</span>, <span class="va">new_events</span>, <span class="va">new_static</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">pred_new</span><span class="op">)</span></span></code></pre></div>
 <p>See the <a href="model-architecture.html">Model architecture</a>
 article for the full configuration reference and the official Gadd et
-al. 2025 hyperparameter table.</p>
+al. (2026) hyperparameter table.</p>
 <hr>
 </div>
 </div>
 <div class="section level2">
 <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
 </h2>
-<p>Gadd, C. et al. (2025). <em>SurvivEHR: Transformer-based survival
-analysis on electronic health records</em>. medRxiv.
-<a href="https://doi.org/10.1101/2025.08.04.25332916" target="_blank" rel="noopener noreferrer" class="external-link">doi:10.1101/2025.08.04.25332916</a></p>
+<p>Gadd, C., Gokhale, K., Acharya, A. et al. (2026). <em>SurvivEHR: a
+competing risks, time-to-event foundation model for multiple long-term
+conditions from primary care electronic health records</em>. npj Digital
+Medicine.
+<a href="https://doi.org/10.1038/s41746-026-02709-z" target="_blank" rel="noopener noreferrer" class="external-link">doi:10.1038/s41746-026-02709-z</a></p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

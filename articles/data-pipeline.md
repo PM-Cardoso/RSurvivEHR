@@ -62,11 +62,11 @@ events_pop <- data.frame(
 
 static_pop <- data.frame(
   patient_id    = 1:10,
-  SEX           = c("M","F","M","F","M","F","M","F","M","F"),
-  ETHNICITY     = c("White","Asian","White","Black","White",
+  sex           = c("M","F","M","F","M","F","M","F","M","F"),
+  ethnicity     = c("White","Asian","White","Black","White",
                     "Asian","White","White","Black","White"),
-  IMD           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
-  YEAR_OF_BIRTH = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
+  imd           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
+  year_of_birth = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
 )
 ```
 
@@ -224,19 +224,19 @@ Source: [`inst/python/survivehr_backend.py`,
 
 Static covariates are encoded into a float32 matrix:
 
-- **Numeric columns** (`IMD`, `YEAR_OF_BIRTH`): passed through as-is;
+- **Numeric columns** (`imd`, `year_of_birth`): passed through as-is;
   `NaN` filled with `0.0`.
-- **Categorical columns** (`SEX`, `ETHNICITY`): one-hot encoded with
+- **Categorical columns** (`sex`, `ethnicity`): one-hot encoded with
   `pd.get_dummies`.
 
 For `static_pop`:
 
 | Column | Input | Encoded columns |
 |----|----|----|
-| SEX | “M” / “F” | `SEX_F`, `SEX_M` |
-| ETHNICITY | “White” / “Asian” / “Black” | `ETHNICITY_Asian`, `ETHNICITY_Black`, `ETHNICITY_White` |
-| IMD | 1–5 (integer) | `IMD` (numeric, kept as-is) |
-| YEAR_OF_BIRTH | 1952–1978 | `YEAR_OF_BIRTH` (numeric) |
+| sex | “M” / “F” | `sex_F`, `sex_M` |
+| ethnicity | “White” / “Asian” / “Black” | `ethnicity_Asian`, `ethnicity_Black`, `ethnicity_White` |
+| imd | 1–5 (integer) | `imd` (numeric, kept as-is) |
+| year_of_birth | 1952–1978 | `year_of_birth` (numeric) |
 
 This produces a matrix of shape `(n_patients, 7)`. The encoded column
 list is stored in the bundle (`static_col_names`) and used at prediction

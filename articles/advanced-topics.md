@@ -235,11 +235,11 @@ events_pop <- data.frame(
 
 static_pop <- data.frame(
   patient_id    = 1:10,
-  SEX           = c("M","F","M","F","M","F","M","F","M","F"),
-  ETHNICITY     = c("White","Asian","White","Black","White",
+  sex           = c("M","F","M","F","M","F","M","F","M","F"),
+  ethnicity     = c("White","Asian","White","Black","White",
                     "Asian","White","White","Black","White"),
-  IMD           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
-  YEAR_OF_BIRTH = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
+  imd           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
+  year_of_birth = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
 )
 
 # ── 2. Config ─────────────────────────────────────────────────────────────────
