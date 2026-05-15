@@ -32,8 +32,9 @@
 #'       token IDs (frequency-descending order, most common = smallest ID).}
 #'     \item{`inv_vocab`}{Reverse mapping from token IDs to event codes.}
 #'     \item{`config`}{The configuration used for training.}
-#'     \item{`time_scale`}{The prediction window / age normalisation divisor
-#'       stored in the bundle.}
+#'     \item{`time_scale`}{The backbone age normalisation divisor stored in
+#'       the bundle.  Used to normalise context ages before they enter the
+#'       transformer; inherited automatically at fine-tune time.}
 #'     \item{`token_policy`}{Token policy flags (`include_unk`,
 #'       `include_cls_sep`).}
 #'     \item{`history`}{List of per-epoch training losses.}
@@ -94,10 +95,10 @@
 #'   imd           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
 #'   year_of_birth = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
 #' )
-#' # 5-year prediction window; ages are in years
+#' # Year-by-year backbone normalisation (ages in years → model sees plain year values)
 #' cfg <- survivehr_config(
 #'   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
-#'   epochs = 10, batch_size = 4, time_scale = 5.0
+#'   epochs = 10, batch_size = 4, time_scale = 1.0
 #' )
 #' pt <- survivehr_pretrain(events_pop, static_pop, cfg)
 #' # Vocabulary is frequency-ordered: most-common events get the smallest IDs
@@ -156,8 +157,11 @@ survivehr_pretrain <- function(events,
 #' @param static_covariates An optional `data.frame` with the **same
 #'   columns** as those used at pre-training time.  Pass `NULL` to omit.
 #' @param config A named list from `survivehr_config()`.  `time_scale` is
-#'   inherited from the pre-trained bundle when `pretrained_model` is
-#'   supplied — no need to set it here.
+#'   inherited automatically from the pretrained bundle — no need to set it
+#'   here.  Use `outcome_horizon` to set the ODE prediction window length
+#'   (in the same units as `age`) independently of `time_scale`.  For
+#'   example, `outcome_horizon = 5` gives a 5-year risk window regardless
+#'   of the backbone normalisation scale.
 #' @param pretrained_model Model bundle returned by `survivehr_pretrain()`
 #'   or `survivehr_load_model()`.  When supplied, the vocabulary, weights,
 #'   and `time_scale` are inherited from the bundle.
@@ -191,8 +195,8 @@ survivehr_pretrain <- function(events,
 #'
 #' cfg_cr <- survivehr_config(
 #'   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
-#'   epochs = 10, batch_size = 4, surv_layer = "competing-risk"
-#'   # time_scale inherited automatically from the pretrained bundle
+#'   epochs = 10, batch_size = 4, surv_layer = "competing-risk",
+#'   outcome_horizon = 5.0  # 5-year prediction window; time_scale inherited from pt
 #' )
 #' ft_cr <- survivehr_finetune(
 #'   events = ft_events_cr, targets = targets_cr,
@@ -278,9 +282,10 @@ survivehr_finetune <- function(events,
 #'   ignored for fine-tuned models).
 #' @param eval_times An optional numeric vector of time points (in the same
 #'   units as `age`) at which to read the cumulative-incidence CDF for
-#'   fine-tuned models.  Each value must be in `(0, time_scale]` — the model's
-#'   trained prediction window.  For example, with `time_scale = 5.0` (years)
-#'   use `eval_times = c(1, 2, 3, 5)` to obtain 1-, 2-, 3- and 5-year risks.
+#'   fine-tuned models.  Each value must be in `(0, outcome_horizon]` — the
+#'   ODE prediction window stored in the fine-tuned bundle.  For example,
+#'   with `outcome_horizon = 5.0` (years) use `eval_times = c(1, 2, 3, 5)`
+#'   to obtain 1-, 2-, 3- and 5-year risks.
 #'   When `NULL` (default) only `_cdf_last` (risk at the full horizon) and
 #'   `_auc` (average risk) are returned, preserving backward compatibility.
 #'   Ignored for pretrain models.
@@ -288,7 +293,7 @@ survivehr_finetune <- function(events,
 #'   \describe{
 #'     \item{`patient_id`}{Patient identifier.}
 #'     \item{`{outcome}_cdf_last`}{Cumulative incidence at the **end** of the
-#'       prediction window (`t = time_scale`).}
+#'       prediction window (`t = outcome_horizon`).}
 #'     \item{`{outcome}_auc`}{Area under the CDF integrated from 0 to
 #'       `time_scale`.  Interpretable as average risk over the window.}
 #'     \item{`{outcome}_cdf_t{X}`}{*(Only when `eval_times` is supplied.)*
@@ -318,9 +323,9 @@ survivehr_finetune <- function(events,
 #' print(preds)
 #' # Columns: patient_id, CVD_cdf_last, CVD_auc
 #' #
-#' # CVD_cdf_last : probability of CVD within the next 5 years (time_scale = 5.0,
-#' #                stored in the model bundle — no need to set it at predict time)
-#' # CVD_auc      : average cumulative CVD risk over that 5-year window;
+#' # CVD_cdf_last : probability of CVD within outcome_horizon (5 years when
+#' #                outcome_horizon = 5.0); stored in the bundle automatically
+#' # CVD_auc      : average cumulative CVD risk over that window;
 #' #                higher = greater overall risk
 #' }
 survivehr_predict <- function(model_bundle,

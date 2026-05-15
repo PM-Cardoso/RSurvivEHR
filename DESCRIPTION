@@ -1,21 +1,25 @@
 Package: RSurvivEHR
 Type: Package
 Title: Survival Analysis on Electronic Health Records via SurvivEHR
-Version: 0.8.2
+Version: 0.9.0
 Authors@R: person(given = "Pedro", family = "Cardoso", role = c("aut", "cre"),
     email = "p.cardoso@exeter.ac.uk", comment = c(ORCID = "0000-0002-1014-9058"))
-Description: An R interface to SurvivEHR, a transformer-based survival model
-    for longitudinal Electronic Health Record (EHR) data. Build a vocabulary
-    from clinical event sequences, pre-train a competing-risk or single-risk
-    survival backbone, fine-tune on labelled outcomes (single-risk or
-    competing-risk), and predict cumulative-incidence curves — all from plain
-    R data frames. Input data frames use consistent lowercase column names
-    (`patient_id`, `event`, `age`, `value`; `patient_id`, `target_event`,
-    `target_age`); uppercase aliases are accepted for backward compatibility.
-    Supports biomarker values alongside discrete events, leakage-free cohort
-    construction helpers, and frequency-ordered vocabularies. The Python
-    backend is vendored inside the package and managed automatically via
-    'reticulate'.
+Description: An R interface to SurvivEHR (Gadd et al., 2026,
+    <doi:10.1038/s41746-026-02709-z>), a GPT-style transformer pre-trained on
+    longitudinal Electronic Health Record (EHR) event sequences and fine-tuned
+    for time-to-event prediction using neural ordinary differential equation
+    survival heads. The package covers the full modelling pipeline: vocabulary
+    construction from clinical event histories, backbone pre-training with
+    competing-risk or single-risk survival objectives, supervised fine-tuning
+    on labelled outcome cohorts, and inference returning cumulative-incidence
+    curves at arbitrary time horizons. Static covariates (demographics,
+    deprivation indices) are one-hot encoded and fused with the sequence
+    representations. Continuous biomarker values (e.g. blood pressure, HbA1c)
+    can be modelled alongside discrete events via an auxiliary Gaussian
+    regression head. Helper functions enforce leakage-free cohort construction
+    and validate input schemas with informative R-level errors. All input
+    accepts plain R data frames; the Python backend is vendored inside the
+    package and managed automatically via 'reticulate'.
 License: GPL-3
 Encoding: UTF-8
 LazyData: false

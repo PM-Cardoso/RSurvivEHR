@@ -30,7 +30,7 @@ study (Gadd et al., 2026), and how to choose values for your own data.
 [Optimisation](#optimisation-learning_rate-epochs-batch_size) ·
 [Loss weights](#loss-weights-surv_layer-surv_weight-value_weight) ·
 [Tokenisation](#tokenisation-include_unk-include_cls_sep) ·
-[Time & age](#time--age-time_scale) ·
+[Time & age](#time--age-time_scale-and-outcome_horizon) ·
 [Hardware](#hardware-device) ·
 [Fine-tuning notes](#fine-tuning-notes)
 
@@ -125,7 +125,7 @@ cfg_small <- survivehr_config(
   epochs        = 20,
   batch_size    = 8,
   surv_layer    = "competing-risk",
-  time_scale    = 5.0     # 5-year prediction window
+  time_scale    = 1.0     # backbone normalisation (set outcome_horizon at fine-tune time)
 )
 ```
 
@@ -142,7 +142,7 @@ cfg_medium <- survivehr_config(
   epochs        = 10,
   batch_size    = 32,
   surv_layer    = "competing-risk",
-  time_scale    = 5.0
+  time_scale    = 1.0     # backbone normalisation (set outcome_horizon at fine-tune time)
 )
 ```
 
@@ -173,8 +173,8 @@ cfg_finetune <- survivehr_config(
   learning_rate = 5e-4,
   epochs        = 20,
   batch_size    = 512,
-  surv_layer    = "competing-risk"
-  # time_scale inherited automatically from the pretrained bundle
+  surv_layer    = "competing-risk",
+  outcome_horizon = 5.0  # 5-year prediction window; time_scale inherited from pretrained bundle
 )
 ```
 
@@ -205,7 +205,8 @@ and
 | | Value regression weight | [`value_weight`](#loss-weights-surv_layer-surv_weight-value_weight) | 0.1 | — |
 | **Tokenisation** | Reserve `<UNK>` token | [`include_unk`](#tokenisation-include_unk-include_cls_sep) | `TRUE` | (inherited) |
 | | Add `<CLS>`/`<SEP>` tokens | [`include_cls_sep`](#tokenisation-include_unk-include_cls_sep) | `FALSE` | (inherited) |
-| **Time / age** | Age normalisation & prediction window | [`time_scale`](#time--age-time_scale) | 1.0 | (inherited) |
+| **Time / age** | Age normalisation divisor | [`time_scale`](#time--age-time_scale-and-outcome_horizon) | 1.0 | (inherited) |
+| | ODE prediction window | [`outcome_horizon`](#time--age-time_scale-and-outcome_horizon) | — | 5.0 |
 | **Hardware** | Compute device | [`device`](#hardware-device) | `"auto"` (GPU) | `"auto"` (GPU) |
 
 > **Note on the optimiser:** the upstream CPRD study used separate backbone
@@ -249,7 +250,8 @@ cfg <- survivehr_config(
   include_cls_sep = FALSE,   # add <CLS>/<SEP> tokens; upstream: FALSE (GPT-style)
 
   # -- Age / time handling -------------------------------------------------
-  time_scale    = 1.0,       # age normalisation divisor and prediction window length
+  time_scale      = 1.0,       # backbone age normalisation divisor (raw_age / time_scale)
+  outcome_horizon = NULL,      # ODE prediction window (fine-tune only); NULL = inherit time_scale
 
   # -- Hardware ------------------------------------------------------------
   device        = "auto"     # "auto", "cpu", or "cuda"
@@ -425,24 +427,55 @@ Set `TRUE` only if you are adapting RSurvivEHR for BERT-style models.
 
 ---
 
-### Time & age: `time_scale`
+### Time & age: `time_scale` and `outcome_horizon`
 
-All raw patient ages are divided by `time_scale` before entering the model.
-The survival ODE then integrates over a normalised grid $[0, 1]$, which maps
-back to $[0, \texttt{time\_scale}]$ in your original age units.  This means
-`time_scale` simultaneously controls **age normalisation** and the
-**prediction window length**.
+These two parameters were previously a single value (`time_scale`) that
+controlled both the backbone input scale and the prediction window.
+They are now **independent**.
 
-**Must be consistent** across pre-training, fine-tuning, and prediction.
-The value is stored in every model bundle and reused automatically — you do
-**not** need to repeat it in a fine-tune config.
+#### `time_scale` — backbone age normalisation
 
-| Age unit | Desired window | Recommended `time_scale` |
+All raw event ages are divided by `time_scale` before entering the transformer:
+
+$$\text{age\_norm} = \frac{\text{raw\_age}}{\text{time\_scale}}$$
+
+This controls only how the backbone *sees* age values — it has nothing to do
+with the prediction window.  **Must be identical** between pre-training and
+fine-tuning.  The value is stored in the pretrained bundle and inherited
+automatically — you do **not** need to set it in a fine-tune config.
+
+| Age unit | Recommended `time_scale` |
+|---|---|
+| Years (e.g. `50.0`) | `1.0` — backbone sees year values directly |
+| Days since birth (e.g. `18262`) | `365.25` — backbone sees normalised fractions |
+
+#### `outcome_horizon` — ODE prediction window (fine-tune only)
+
+The survival ODE integrates over a normalised grid $[0, 1]$, where $1.0$
+maps back to `outcome_horizon` in your raw age units.  This is what
+determines what `cdf_last` means and what values are valid in `eval_times`.
+
+`outcome_horizon` can **differ freely from `time_scale`**.  The canonical
+use case is:
+
+```r
+# Pre-train: year-by-year backbone normalisation
+cfg_pt <- survivehr_config(time_scale = 1.0)
+
+# Fine-tune: 5-year risk window, independent of time_scale
+cfg_ft <- survivehr_config(outcome_horizon = 5.0)
+```
+
+| `outcome_horizon` | `cdf_last` meaning | Valid `eval_times` |
 |---|---|---|
-| Years (e.g. `50.0`) | 1 year | `1.0` |
-| Years (e.g. `50.0`) | 5 years | `5.0` |
-| Days since birth (e.g. `18262`) | 1 year | `365.25` |
-| Days since birth (e.g. `18262`) | 5 years | `1826.25` |
+| `1.0` | 1-year risk | `(0, 1]` years |
+| `5.0` | 5-year risk | `(0, 5]` years |
+| `1826.25` | 5-year risk (ages in days) | `(0, 1826.25]` days |
+
+If `outcome_horizon = NULL` (default), it inherits `time_scale` for backward
+compatibility.  `outcome_horizon` is stored in every fine-tune bundle and used
+automatically at prediction time — no need to specify it when calling
+`survivehr_predict()`.
 
 ---
 
@@ -465,6 +498,7 @@ time:
 | Parameter | Fine-tuning behaviour |
 |---|---|
 | `time_scale` | Inherited automatically from the pretrained bundle; value in fine-tune config is ignored. |
+| `outcome_horizon` | **Fine-tune only.** Sets the ODE prediction window length independently of `time_scale`.  Stored in the fine-tune bundle; read automatically by `survivehr_predict()`.  Defaults to `time_scale` if not set. |
 | `include_unk` | Inherited from the pretrained bundle vocabulary. |
 | `include_cls_sep` | Inherited from the pretrained bundle vocabulary. |
 | `block_size` | Can be increased at fine-tune time (e.g. 256 → 512) to provide a longer context. |

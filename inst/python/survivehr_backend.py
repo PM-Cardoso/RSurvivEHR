@@ -245,8 +245,8 @@ class BuiltData:
     static_col_names: List[str]     # encoded column names after one-hot expansion — used to align prediction-time tensors
     event_vocab: Dict[str, int]
     inv_vocab: Dict[int, str]
-    time_scale: float            # age divisor AND prediction window length in raw age units
-                                 # (e.g. 5.0 → 5-year window when ages are in years)
+    time_scale: float            # backbone age normalisation divisor (raw_age / time_scale → model input)
+                                 # always inherited from the pretrained bundle; NOT the prediction window
     token_policy: Dict[str, Any]
 
 
@@ -325,20 +325,21 @@ def _build_context_data(events_df: pd.DataFrame,
     """
     Build padded tensor arrays from raw event data.
 
-    Age normalisation and prediction window
-    ----------------------------------------
-    Each event age is divided by *time_scale* to give a dimensionless value:
+    Age normalisation
+    -----------------
+    Each event age is divided by *time_scale* to give a dimensionless value
+    that the backbone transformer sees as input:
 
         age_norm = raw_age / time_scale
 
-    The survival ODE evaluates on a fixed normalised grid [0, 1].  Normalised
-    time 1.0 maps back to *time_scale* in raw age units.  Therefore
-    **time_scale is both the age divisor and the length of the prediction
-    window** in the same units as the ``age`` column:
+    ``time_scale`` controls **only** the backbone input scale and is always
+    inherited from the pretrained bundle.  The prediction window (ODE grid
+    calibration) is controlled separately by ``outcome_horizon`` in
+    ``FineTuneDataset`` — keeping the two concepts independent.
 
-    - ``time_scale=5.0`` with ages in years  → 5-year prediction window
-    - ``time_scale=1.0`` with ages in years  → 1-year prediction window
-    - ``time_scale=365.25`` with ages in days → 1-year prediction window
+    Examples:
+    - ``time_scale=1.0`` with ages in years  → backbone sees age as a plain year value
+    - ``time_scale=365.25`` with ages in days → backbone sees normalised fraction
 
     The value is stored inside every model bundle and retrieved automatically
     by ``predict_next_events`` — it does not need to be supplied at inference.
@@ -450,7 +451,25 @@ class PretrainDataset(Dataset):
 
 
 class FineTuneDataset(Dataset):
-    def __init__(self, built: BuiltData, targets_df: pd.DataFrame):
+    def __init__(self, built: BuiltData, targets_df: pd.DataFrame,
+                 outcome_horizon: Optional[float] = None):
+        """
+        Parameters
+        ----------
+        built            : BuiltData produced by _build_context_data().
+        targets_df       : DataFrame with target event labels.
+        outcome_horizon  : Length of the ODE prediction window in the same raw
+                           age units as the ``age`` column (e.g. 5.0 for a
+                           5-year risk window when ages are in years).
+                           Defaults to ``built.time_scale`` for backward
+                           compatibility, but can differ freely from it.
+                           Examples:
+                             time_scale=1.0, outcome_horizon=5.0
+                               → backbone sees year-by-year ages;
+                                 ODE CDF covers 0–5 years.
+                             time_scale=1.0, outcome_horizon=1.0
+                               → both backbone and ODE use 1-year scale.
+        """
         targets = _clean_targets(targets_df)
 
         by_patient = targets.groupby("patient_id", sort=False).last().reset_index()
@@ -461,7 +480,16 @@ class FineTuneDataset(Dataset):
         target_age_deltas = []
         target_values = []
 
-        time_scale = float(built.time_scale)
+        # backbone_time_scale: used ONLY to undo the age normalisation applied
+        #   in _build_context_data so we can recover a raw age from age_norm.
+        backbone_time_scale = float(built.time_scale)
+        # outcome_horizon: controls the ODE prediction window.  delta_norm=1.0
+        #   corresponds to outcome_horizon raw age units from the last event.
+        if outcome_horizon is None:
+            outcome_horizon = backbone_time_scale
+        outcome_horizon = float(outcome_horizon)
+        if outcome_horizon <= 0:
+            raise ValueError(f"outcome_horizon must be positive, got {outcome_horizon}")
 
         for _, row in by_patient.iterrows():
             pid = row["patient_id"]
@@ -476,13 +504,13 @@ class FineTuneDataset(Dataset):
             last_attended = int(np.sum(built.attention_mask[i]) - 1)
             context_age_norm = float(built.ages[i][last_attended])
 
-            # Recover raw age: ages_norm = raw_age / time_scale, so
-            #   raw_age = context_age_norm * time_scale
-            context_age_raw = context_age_norm * time_scale
+            # Recover raw age by undoing the backbone normalisation.
+            context_age_raw = context_age_norm * backbone_time_scale
 
-            # Delta in the same raw units, then normalise by time_scale
+            # Delta in raw age units; normalise by outcome_horizon so that
+            # delta_norm=1.0 maps to the end of the prediction window.
             delta = max(float(row["target_age"]) - context_age_raw, 0.0)
-            delta_norm = delta / time_scale
+            delta_norm = delta / outcome_horizon
 
             selected_rows.append(i)
             target_tokens.append(int(built.event_vocab[event_name]))
@@ -740,12 +768,22 @@ def train_finetune_model(events_df: pd.DataFrame,
     token_policy = _token_policy_from_config(config)
     time_scale = float(config.get("time_scale", 1.0))
 
+    # outcome_horizon: the ODE prediction window length (raw age units).
+    # Independent of time_scale — can differ freely.
+    # If not supplied, defaults to time_scale for backward compatibility.
+    outcome_horizon_raw = config.get("outcome_horizon", None)
+    outcome_horizon = float(outcome_horizon_raw) if outcome_horizon_raw is not None else None
+
     if pretrained_bundle is not None:
         event_vocab = dict(pretrained_bundle["event_vocab"])
         token_policy = dict(pretrained_bundle.get("token_policy", token_policy))
         # Always inherit time_scale from the pretrained bundle so context
         # normalisation is identical between pretrain and fine-tune.
         time_scale = float(pretrained_bundle.get("time_scale", time_scale))
+
+    # Resolve outcome_horizon now that time_scale is finalised.
+    if outcome_horizon is None:
+        outcome_horizon = time_scale
 
     built = _build_context_data(events_df=events_df,
                                 static_df=static_df,
@@ -787,7 +825,7 @@ def train_finetune_model(events_df: pd.DataFrame,
 
     outcome_tokens = [built.event_vocab[o] for o in outcomes]
 
-    ds = FineTuneDataset(built, targets_df=targets_df)
+    ds = FineTuneDataset(built, targets_df=targets_df, outcome_horizon=outcome_horizon)
     loader = DataLoader(ds, batch_size=int(config.get("batch_size", 16)), shuffle=True)
 
     model = FineTuneExperiment(cfg=cfg, outcome_tokens=outcome_tokens, risk_model=risk_model, vocab_size=len(built.event_vocab))
@@ -846,6 +884,7 @@ def train_finetune_model(events_df: pd.DataFrame,
         "inv_vocab": built.inv_vocab,
         "block_size": int(config.get("block_size", 128)),
         "time_scale": built.time_scale,
+        "outcome_horizon": outcome_horizon,
         "outcomes": list(outcomes),  # always a list — guards against reticulate round-trip
         "risk_model": risk_model,
         "token_policy": token_policy,
@@ -939,7 +978,11 @@ def predict_next_events(model_bundle: Dict[str, Any],
             cdfs = outputs["surv"]["surv_CDF"] or []
 
             # ── Validate and resolve eval_times to grid indices ───────────────
-            time_scale = float(model_bundle.get("time_scale", 1.0))
+            # outcome_horizon is the ODE prediction window stored in the fine-tune
+            # bundle.  Falls back to time_scale for bundles saved before this
+            # feature was introduced.
+            _ts = float(model_bundle.get("time_scale", 1.0))
+            outcome_horizon = float(model_bundle.get("outcome_horizon", _ts))
             eval_time_indices: List[tuple] = []
             if eval_times is not None:
                 n_grid = cdfs[0].shape[1] if cdfs else 1000
@@ -949,13 +992,13 @@ def predict_next_events(model_bundle: Dict[str, Any],
                         raise ValueError(
                             f"eval_times must be positive, got {t}."
                         )
-                    if t > time_scale:
+                    if t > outcome_horizon:
                         raise ValueError(
                             f"eval_time {t} exceeds the model's prediction window "
-                            f"(time_scale={time_scale}). "
-                            f"Supply times in the range (0, {time_scale}]."
+                            f"(outcome_horizon={outcome_horizon}). "
+                            f"Supply times in the range (0, {outcome_horizon}]."
                         )
-                    idx = min(int(round((t / time_scale) * (n_grid - 1))), n_grid - 1)
+                    idx = min(int(round((t / outcome_horizon) * (n_grid - 1))), n_grid - 1)
                     eval_time_indices.append((t, idx))
 
             rows = []
@@ -1110,6 +1153,7 @@ def save_model_bundle(model_bundle: Dict[str, Any], path: str) -> None:
         "inv_vocab": model_bundle["inv_vocab"],
         "block_size": model_bundle["block_size"],
         "time_scale": model_bundle.get("time_scale", 1.0),
+        "outcome_horizon": model_bundle.get("outcome_horizon", model_bundle.get("time_scale", 1.0)),
         "outcomes": _outcomes,
         "risk_model": model_bundle.get("risk_model", "competing-risk"),
         "token_policy": model_bundle.get("token_policy", _token_policy_from_config()),
@@ -1151,6 +1195,7 @@ def load_model_bundle(path: str) -> Dict[str, Any]:
         "inv_vocab": payload["inv_vocab"],
         "block_size": int(payload["block_size"]),
         "time_scale": float(payload.get("time_scale", 1.0)),
+        "outcome_horizon": float(payload.get("outcome_horizon", payload.get("time_scale", 1.0))),
         "outcomes": outcomes if kind == "finetune" else payload.get("outcomes", None),
         "risk_model": payload.get("risk_model", "competing-risk"),
         "token_policy": payload.get("token_policy", _token_policy_from_config()),

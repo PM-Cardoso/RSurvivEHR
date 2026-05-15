@@ -20,29 +20,47 @@
 #' @param device "auto", "cpu", or "cuda".
 #' @param include_unk Whether to reserve and use `<UNK>` for unseen events.
 #' @param include_cls_sep Whether to add `<CLS>` and `<SEP>` around each sequence.
-#' @param time_scale Controls both the age normalisation and the length of the
-#'   prediction window.  Every raw age is divided by this value before entering
-#'   the model; the survival ODE evaluates over a normalised \code{[0, 1]} grid
-#'   that maps back to \code{[0, time_scale]} in your original age units.
+#' @param time_scale Age normalisation divisor for the backbone transformer.
+#'   Every raw age is divided by this value before entering the model:
+#'   \code{age_norm = raw_age / time_scale}.  Must be consistent between
+#'   pre-training and fine-tuning (inherited automatically from the pretrained
+#'   bundle).  Does **not** control the prediction window — use
+#'   \code{outcome_horizon} for that.
 #'   \itemize{
-#'     \item Use \code{5.0} for a 5-year prediction window with ages in years (recommended).
-#'     \item Use \code{1.0} for a 1-year window with ages in years.
-#'     \item Use \code{365.25} for a 1-year window with ages in days.
-#'     \item Use \code{1826.25} for a 5-year window with ages in days.
+#'     \item \code{1.0} (default) — ages in years, backbone sees plain year values.
+#'     \item \code{365.25} — ages in days, backbone sees normalised fractions.
 #'   }
-#'   Stored automatically in every model bundle; no need to supply at prediction time.
-#'   Must be the same across pretrain, fine-tune, and prediction.
+#' @param outcome_horizon Length of the ODE prediction window in the same raw
+#'   age units as the \code{age} column.  The survival ODE integrates over a
+#'   normalised \code{[0, 1]} grid that maps back to
+#'   \code{[0, outcome_horizon]} in raw age units.  Can differ freely from
+#'   \code{time_scale} — this is what makes it possible to use year-by-year
+#'   age normalisation (\code{time_scale = 1.0}) while producing a 5-year risk
+#'   (\code{outcome_horizon = 5.0}).
+#'   \itemize{
+#'     \item \code{NULL} (default) — inherits \code{time_scale} (backward compatible).
+#'     \item \code{5.0} — 5-year prediction window when ages are in years.
+#'     \item \code{1.0} — 1-year prediction window when ages are in years.
+#'     \item \code{1826.25} — 5-year window when ages are in days.
+#'   }
+#'   Fine-tune only; ignored at pre-training.  Stored in the fine-tune bundle
+#'   and used automatically at prediction time.
 #'
 #' @return Named list used by training functions.
 #' @export
 #' @examples
-#' # Minimal config for a 5-year prediction window (ages in years)
+#' # Year-by-year backbone normalisation with a 5-year prediction window
 #' cfg <- survivehr_config(
 #'   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
-#'   epochs = 1, batch_size = 4, time_scale = 5.0
+#'   epochs = 1, batch_size = 4,
+#'   time_scale = 1.0,        # backbone: ages enter model as plain year values
+#'   outcome_horizon = 5.0    # ODE: cdf_last = 5-year risk
 #' )
-#' cfg$surv_layer   # "competing-risk"
-#' cfg$time_scale   # 5.0
+#' cfg$outcome_horizon  # 5
+#'
+#' # Both default to 1.0 if outcome_horizon is omitted (backward compatible)
+#' cfg2 <- survivehr_config(time_scale = 1.0)
+#' cfg2$outcome_horizon  # NULL → inherits time_scale in the backend
 survivehr_config <- function(
   block_size = 128,
   n_layer = 4,
@@ -58,7 +76,8 @@ survivehr_config <- function(
   device = "auto",
   include_unk = TRUE,
   include_cls_sep = FALSE,
-  time_scale = 1.0
+  time_scale = 1.0,
+  outcome_horizon = NULL
 ) {
   list(
     block_size = as.integer(block_size),
@@ -75,6 +94,7 @@ survivehr_config <- function(
     device = as.character(device),
     include_unk = as.logical(include_unk),
     include_cls_sep = as.logical(include_cls_sep),
-    time_scale = as.numeric(time_scale)
+    time_scale = as.numeric(time_scale),
+    outcome_horizon = if (is.null(outcome_horizon)) NULL else as.numeric(outcome_horizon)
   )
 }

@@ -178,7 +178,8 @@ cfg <- survivehr_config(
   batch_size    = 4,
   surv_layer    = "competing-risk",  # or "single-risk" — see Section 5
   value_weight  = 0.1,  # weight for value regression loss (0 = disabled)
-  time_scale    = 5.0   # prediction window = 5 years (ages are in years)
+  time_scale    = 1.0   # backbone normalisation: age / 1.0 — keeps year values as-is
+  # outcome_horizon is set per fine-tune call (e.g. 5.0 for 5-year risk)
 )
 ```
 
@@ -188,7 +189,8 @@ Key parameters:
 |---|---|
 | `block_size` | Context window length — sequences are padded/truncated to this. |
 | `surv_layer` | Controls the **backbone** time-to-next-event head during pre-training (and must remain consistent at fine-tune).  Leave at `"competing-risk"` (default) for most use cases.  The outcome-level head is controlled by `risk_model` in `survivehr_finetune()` — see Section 5. |
-| `time_scale` | **Sets both the age normalisation divisor and the prediction window length.** Ages are divided by this value before entering the model; the survival ODE evaluates over a normalised [0, 1] grid mapping back to [0, `time_scale`] in your age units. Use `5.0` for a 5-year window with ages in years, `1.0` for 1-year. Stored in every model bundle — `survivehr_predict()` reads it automatically. |
+| `time_scale` | **Backbone age normalisation only.** Every raw event age is divided by this before entering the model (`age_norm = raw_age / time_scale`).  Use `1.0` (default) when ages are in years.  Stored in the pretrained bundle and **inherited automatically** at fine-tune time — do not set it in a fine-tune config. |
+| `outcome_horizon` | **Fine-tune only.** Length of the ODE prediction window in the same units as `age`.  The survival ODE integrates from 0 to `outcome_horizon`, so `cdf_last` = risk at that horizon.  Can differ freely from `time_scale` — e.g. `time_scale = 1.0` (year normalisation) with `outcome_horizon = 5.0` (5-year risk).  Defaults to `time_scale` if not set. |
 | `include_unk` | If `TRUE` (default), a `<UNK>` token is reserved for unseen events at prediction time. |
 
 ---
@@ -342,7 +344,8 @@ survivehr_validate_events(ft_events_cr)
 cfg_cr <- survivehr_config(
   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
   dropout = 0, learning_rate = 3e-4, epochs = 10, batch_size = 4,
-  surv_layer = "competing-risk"
+  surv_layer = "competing-risk",
+  outcome_horizon = 5.0  # 5-year prediction window (time_scale=1.0 inherited from pt)
 )
 
 ft_cr <- survivehr_finetune(
@@ -388,7 +391,8 @@ survivehr_validate_events(ft_events_sr)
 cfg_sr <- survivehr_config(
   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
   dropout = 0, learning_rate = 3e-4, epochs = 10, batch_size = 4,
-  surv_layer = "competing-risk"
+  surv_layer = "competing-risk",
+  outcome_horizon = 5.0  # 5-year prediction window (time_scale=1.0 inherited from pt)
 )
 
 ft_sr <- survivehr_finetune(
@@ -510,7 +514,7 @@ head(preds_cr_tp)
 
 | Column | Description |
 |---|---|
-| `{outcome}_cdf_last` | Cumulative incidence at the **end** of the prediction window.  With `time_scale = 5.0` this is the estimated 5-year risk from the patient's last recorded event. |
+| `{outcome}_cdf_last` | Cumulative incidence at the **end** of the prediction window.  `cdf_last` equals the risk at `outcome_horizon` raw time units from the patient's last recorded event. |
 | `{outcome}_auc` | **Area under the CDF** integrated across the full window.  A single scalar risk score; values closer to 1 indicate higher overall risk. |
 | `{outcome}_cdf_t{X}` | *(Only when `eval_times` is supplied.)* Cumulative incidence at time `X` in the same units as `age`, e.g. `CVD_cdf_t1` for 1-year CVD risk. |
 
@@ -530,10 +534,11 @@ head(preds_cr_tp)
 | `predicted_value_mean` | Predicted mean of the Gaussian distribution for the event's numeric measurement. |
 | `predicted_value_sd` | Predicted standard deviation. |
 
-> **ODE grid**: the survival head evaluates on 1 000 equally-spaced time steps
-> from 0 to 1 in normalised time (0 to `time_scale` in raw units).
+> **ODE grid**: the survival head evaluates on 1 000 equally-spaced time steps
+> from 0 to 1 in normalised time (0 to `outcome_horizon` in raw units).
 > `eval_times` values are snapped to the nearest grid point, giving a
-> resolution of `time_scale / 999` (≈ 0.005 years with `time_scale = 5.0`).
+> resolution of `outcome_horizon / 999` (≈ 0.005 years with
+> `outcome_horizon = 5.0`).
 
 ### New patients at inference
 
