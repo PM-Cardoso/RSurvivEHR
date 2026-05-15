@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,6 +38,51 @@
       <small>Source: <a href="https://github.com/PM-Cardoso/RSurvivEHR/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.9.0" id="rsurvivehr-090">RSurvivEHR 0.9.0<a class="anchor" aria-label="anchor" href="#rsurvivehr-090"></a></h2>
+<div class="section level4">
+<h4 id="new-feature-outcome_horizon--independent-ode-prediction-window-0-9-0">New feature: <code>outcome_horizon</code> — independent ODE prediction window<a class="anchor" aria-label="anchor" href="#new-feature-outcome_horizon--independent-ode-prediction-window-0-9-0"></a></h4>
+<p>The backbone age normalisation (<code>time_scale</code>) and the fine-tune prediction window (<code>outcome_horizon</code>) are now <strong>two independent parameters</strong>.</p>
+<p>Previously, a single <code>time_scale</code> value was used for both purposes: it divided all event ages before they entered the transformer, <em>and</em> it defined the length of the survival ODE grid at fine-tune time. This meant the prediction window was locked to whatever age-normalisation divisor was chosen at pre-training, making it impossible to, for example, pre-train with year-by-year normalisation (<code>time_scale = 1.0</code>) and produce 5-year risk curves (<code>outcome_horizon = 5.0</code>).</p>
+<p><strong>How to use the new parameter:</strong></p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Pre-train with year-by-year backbone normalisation</span></span>
+<span><span class="va">cfg_pretrain</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_config.html">survivehr_config</a></span><span class="op">(</span></span>
+<span>  <span class="va">...</span>,</span>
+<span>  time_scale <span class="op">=</span> <span class="fl">1.0</span>   <span class="co"># backbone: ages enter the model as plain year values</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">pt</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_pretrain.html">survivehr_pretrain</a></span><span class="op">(</span><span class="va">events</span>, <span class="va">static</span>, <span class="va">cfg_pretrain</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Fine-tune for a 5-year risk window — independent of time_scale</span></span>
+<span><span class="va">cfg_ft</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_config.html">survivehr_config</a></span><span class="op">(</span></span>
+<span>  <span class="va">...</span>,</span>
+<span>  outcome_horizon <span class="op">=</span> <span class="fl">5.0</span>  <span class="co"># ODE: cdf_last = 5-year risk from last event</span></span>
+<span>  <span class="co"># time_scale not needed — inherited automatically from pretrained bundle</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">ft</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_finetune.html">survivehr_finetune</a></span><span class="op">(</span><span class="va">events_ft</span>, <span class="va">targets</span>, <span class="st">"CVD"</span>, config <span class="op">=</span> <span class="va">cfg_ft</span>,</span>
+<span>                         pretrained_model <span class="op">=</span> <span class="va">pt</span><span class="op">)</span></span></code></pre></div>
+<p><strong>Backward compatibility:</strong> if <code>outcome_horizon</code> is not set, it defaults to <code>time_scale</code> — existing workflows continue to work without modification. <code>outcome_horizon</code> is stored in every fine-tune bundle and read automatically at prediction time.</p>
+<p><strong>Details:</strong></p>
+<table class="table"><colgroup><col width="33%"><col width="33%"><col width="33%"></colgroup><thead><tr><th>What it controls</th>
+<th>Parameter</th>
+<th>Stage</th>
+</tr></thead><tbody><tr><td>
+<code>age / time_scale</code> fed to transformer backbone</td>
+<td><code>time_scale</code></td>
+<td>Pre-train (locked); fine-tune (inherited)</td>
+</tr><tr><td>ODE grid length; <code>cdf_last</code> horizon; <code>eval_times</code> validation</td>
+<td><code>outcome_horizon</code></td>
+<td>Fine-tune only</td>
+</tr></tbody></table><ul><li>
+<code><a href="../reference/survivehr_config.html">survivehr_config()</a></code>: new <code>outcome_horizon</code> parameter (default <code>NULL</code> → inherits <code>time_scale</code>).</li>
+<li>
+<code><a href="../reference/survivehr_finetune.html">survivehr_finetune()</a></code>: passes <code>outcome_horizon</code> to <code>FineTuneDataset</code>; stores it in the fine-tune bundle.</li>
+<li>
+<code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code>: <code>eval_times</code> values are validated against <code>outcome_horizon</code> (not <code>time_scale</code>).</li>
+<li>
+<code><a href="../reference/survivehr_save_model.html">survivehr_save_model()</a></code> / <code><a href="../reference/survivehr_load_model.html">survivehr_load_model()</a></code>: <code>outcome_horizon</code> is persisted and restored from every <code>.pt</code> bundle.</li>
+</ul><hr></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.8.2" id="rsurvivehr-082">RSurvivEHR 0.8.2<a class="anchor" aria-label="anchor" href="#rsurvivehr-082"></a></h2>
 <div class="section level4">

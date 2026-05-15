@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -83,7 +83,7 @@ hyperparameters</a> · <a href="#survivehr_config-full-parameter-reference">Full
 reference</a> · <a href="#architecture-block_size-n_layer-n_head-n_embd">Architecture</a> ·
 <a href="#regularisation-dropout">Regularisation</a> · <a href="#optimisation-learning_rate-epochs-batch_size">Optimisation</a> ·
 <a href="#loss-weights-surv_layer-surv_weight-value_weight">Loss
-weights</a> · <a href="#tokenisation-include_unk-include_cls_sep">Tokenisation</a> · <a href="#time--age-time_scale">Time &amp; age</a> · <a href="#hardware-device">Hardware</a> · <a href="#fine-tuning-notes">Fine-tuning notes</a></p>
+weights</a> · <a href="#tokenisation-include_unk-include_cls_sep">Tokenisation</a> · <a href="#time--age-time_scale-and-outcome_horizon">Time &amp; age</a> · <a href="#hardware-device">Hardware</a> · <a href="#fine-tuning-notes">Fine-tuning notes</a></p>
 <hr>
 <div class="section level2">
 <h2 id="how-the-model-works">How the model works<a class="anchor" aria-label="anchor" href="#how-the-model-works"></a>
@@ -199,7 +199,7 @@ reference</a>).</p>
 <span>  epochs        <span class="op">=</span> <span class="fl">20</span>,</span>
 <span>  batch_size    <span class="op">=</span> <span class="fl">8</span>,</span>
 <span>  surv_layer    <span class="op">=</span> <span class="st">"competing-risk"</span>,</span>
-<span>  time_scale    <span class="op">=</span> <span class="fl">5.0</span>     <span class="co"># 5-year prediction window</span></span>
+<span>  time_scale    <span class="op">=</span> <span class="fl">1.0</span>     <span class="co"># backbone normalisation (set outcome_horizon at fine-tune time)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
@@ -216,7 +216,7 @@ reference</a>).</p>
 <span>  epochs        <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  batch_size    <span class="op">=</span> <span class="fl">32</span>,</span>
 <span>  surv_layer    <span class="op">=</span> <span class="st">"competing-risk"</span>,</span>
-<span>  time_scale    <span class="op">=</span> <span class="fl">5.0</span></span>
+<span>  time_scale    <span class="op">=</span> <span class="fl">1.0</span>     <span class="co"># backbone normalisation (set outcome_horizon at fine-tune time)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
@@ -248,8 +248,8 @@ patients)<a class="anchor" aria-label="anchor" href="#hpc-large-dataset-upstream
 <span>  learning_rate <span class="op">=</span> <span class="fl">5e-4</span>,</span>
 <span>  epochs        <span class="op">=</span> <span class="fl">20</span>,</span>
 <span>  batch_size    <span class="op">=</span> <span class="fl">512</span>,</span>
-<span>  surv_layer    <span class="op">=</span> <span class="st">"competing-risk"</span></span>
-<span>  <span class="co"># time_scale inherited automatically from the pretrained bundle</span></span>
+<span>  surv_layer    <span class="op">=</span> <span class="st">"competing-risk"</span>,</span>
+<span>  outcome_horizon <span class="op">=</span> <span class="fl">5.0</span>  <span class="co"># 5-year prediction window; time_scale inherited from pretrained bundle</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <hr>
 </div>
@@ -381,12 +381,19 @@ and
 </tr>
 <tr class="odd">
 <td><strong>Time / age</strong></td>
-<td>Age normalisation &amp; prediction window</td>
-<td><a href="#time--age-time_scale"><code>time_scale</code></a></td>
+<td>Age normalisation divisor</td>
+<td><a href="#time--age-time_scale-and-outcome_horizon"><code>time_scale</code></a></td>
 <td>1.0</td>
 <td>(inherited)</td>
 </tr>
 <tr class="even">
+<td></td>
+<td>ODE prediction window</td>
+<td><a href="#time--age-time_scale-and-outcome_horizon"><code>outcome_horizon</code></a></td>
+<td>—</td>
+<td>5.0</td>
+</tr>
+<tr class="odd">
 <td><strong>Hardware</strong></td>
 <td>Compute device</td>
 <td><a href="#hardware-device"><code>device</code></a></td>
@@ -442,7 +449,8 @@ default and a note on the upstream value.</p>
 <span>  include_cls_sep <span class="op">=</span> <span class="cn">FALSE</span>,   <span class="co"># add &lt;CLS&gt;/&lt;SEP&gt; tokens; upstream: FALSE (GPT-style)</span></span>
 <span></span>
 <span>  <span class="co"># -- Age / time handling -------------------------------------------------</span></span>
-<span>  time_scale    <span class="op">=</span> <span class="fl">1.0</span>,       <span class="co"># age normalisation divisor and prediction window length</span></span>
+<span>  time_scale      <span class="op">=</span> <span class="fl">1.0</span>,       <span class="co"># backbone age normalisation divisor (raw_age / time_scale)</span></span>
+<span>  outcome_horizon <span class="op">=</span> <span class="cn">NULL</span>,      <span class="co"># ODE prediction window (fine-tune only); NULL = inherit time_scale</span></span>
 <span></span>
 <span>  <span class="co"># -- Hardware ------------------------------------------------------------</span></span>
 <span>  device        <span class="op">=</span> <span class="st">"auto"</span>     <span class="co"># "auto", "cpu", or "cuda"</span></span>
@@ -789,52 +797,105 @@ for BERT-style models.</p>
 </div>
 </div>
 <div class="section level3">
-<h3 id="time-age-time_scale">Time &amp; age: <code>time_scale</code><a class="anchor" aria-label="anchor" href="#time-age-time_scale"></a>
+<h3 id="time-age-time_scale-and-outcome_horizon">Time &amp; age: <code>time_scale</code> and
+<code>outcome_horizon</code><a class="anchor" aria-label="anchor" href="#time-age-time_scale-and-outcome_horizon"></a>
 </h3>
-<p>All raw patient ages are divided by <code>time_scale</code> before
-entering the model. The survival ODE then integrates over a normalised
-grid
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="false" form="postfix">]</mo></mrow><annotation encoding="application/x-tex">[0, 1]</annotation></semantics></math>,
-which maps back to
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">[</mo><mn>0</mn><mo>,</mo><mtext mathvariant="monospace">𝚝𝚒𝚖𝚎_𝚜𝚌𝚊𝚕𝚎</mtext><mo stretchy="false" form="postfix">]</mo></mrow><annotation encoding="application/x-tex">[0, \texttt{time\_scale}]</annotation></semantics></math>
-in your original age units. This means <code>time_scale</code>
-simultaneously controls <strong>age normalisation</strong> and the
-<strong>prediction window length</strong>.</p>
-<p><strong>Must be consistent</strong> across pre-training, fine-tuning,
-and prediction. The value is stored in every model bundle and reused
-automatically — you do <strong>not</strong> need to repeat it in a
-fine-tune config.</p>
+<p>These two parameters were previously a single value
+(<code>time_scale</code>) that controlled both the backbone input scale
+and the prediction window. They are now
+<strong>independent</strong>.</p>
+<div class="section level4">
+<h4 id="time_scale-backbone-age-normalisation">
+<code>time_scale</code> — backbone age normalisation<a class="anchor" aria-label="anchor" href="#time_scale-backbone-age-normalisation"></a>
+</h4>
+<p>All raw event ages are divided by <code>time_scale</code> before
+entering the transformer:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mtext mathvariant="normal">age_norm</mtext><mo>=</mo><mfrac><mtext mathvariant="normal">raw_age</mtext><mtext mathvariant="normal">time_scale</mtext></mfrac></mrow><annotation encoding="application/x-tex">\text{age\_norm} = \frac{\text{raw\_age}}{\text{time\_scale}}</annotation></semantics></math></p>
+<p>This controls only how the backbone <em>sees</em> age values — it has
+nothing to do with the prediction window. <strong>Must be
+identical</strong> between pre-training and fine-tuning. The value is
+stored in the pretrained bundle and inherited automatically — you do
+<strong>not</strong> need to set it in a fine-tune config.</p>
 <table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
 <thead><tr class="header">
 <th>Age unit</th>
-<th>Desired window</th>
 <th>Recommended <code>time_scale</code>
 </th>
 </tr></thead>
 <tbody>
 <tr class="odd">
 <td>Years (e.g. <code>50.0</code>)</td>
-<td>1 year</td>
-<td><code>1.0</code></td>
-</tr>
-<tr class="even">
-<td>Years (e.g. <code>50.0</code>)</td>
-<td>5 years</td>
-<td><code>5.0</code></td>
-</tr>
-<tr class="odd">
-<td>Days since birth (e.g. <code>18262</code>)</td>
-<td>1 year</td>
-<td><code>365.25</code></td>
+<td>
+<code>1.0</code> — backbone sees year values directly</td>
 </tr>
 <tr class="even">
 <td>Days since birth (e.g. <code>18262</code>)</td>
-<td>5 years</td>
-<td><code>1826.25</code></td>
+<td>
+<code>365.25</code> — backbone sees normalised fractions</td>
 </tr>
 </tbody>
 </table>
+</div>
+<div class="section level4">
+<h4 id="outcome_horizon-ode-prediction-window-fine-tune-only">
+<code>outcome_horizon</code> — ODE prediction window (fine-tune
+only)<a class="anchor" aria-label="anchor" href="#outcome_horizon-ode-prediction-window-fine-tune-only"></a>
+</h4>
+<p>The survival ODE integrates over a normalised grid
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="false" form="postfix">]</mo></mrow><annotation encoding="application/x-tex">[0, 1]</annotation></semantics></math>,
+where
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mn>1.0</mn><annotation encoding="application/x-tex">1.0</annotation></semantics></math>
+maps back to <code>outcome_horizon</code> in your raw age units. This is
+what determines what <code>cdf_last</code> means and what values are
+valid in <code>eval_times</code>.</p>
+<p><code>outcome_horizon</code> can <strong>differ freely from
+<code>time_scale</code></strong>. The canonical use case is:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Pre-train: year-by-year backbone normalisation</span></span>
+<span><span class="va">cfg_pt</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_config.html">survivehr_config</a></span><span class="op">(</span>time_scale <span class="op">=</span> <span class="fl">1.0</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Fine-tune: 5-year risk window, independent of time_scale</span></span>
+<span><span class="va">cfg_ft</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_config.html">survivehr_config</a></span><span class="op">(</span>outcome_horizon <span class="op">=</span> <span class="fl">5.0</span><span class="op">)</span></span></code></pre></div>
+<table class="table">
+<thead><tr class="header">
+<th><code>outcome_horizon</code></th>
+<th>
+<code>cdf_last</code> meaning</th>
+<th>Valid <code>eval_times</code>
+</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><code>1.0</code></td>
+<td>1-year risk</td>
+<td>
+<code>(0, 1]</code> years</td>
+</tr>
+<tr class="even">
+<td><code>5.0</code></td>
+<td>5-year risk</td>
+<td>
+<code>(0, 5]</code> years</td>
+</tr>
+<tr class="odd">
+<td><code>1826.25</code></td>
+<td>5-year risk (ages in days)</td>
+<td>
+<code>(0, 1826.25]</code> days</td>
+</tr>
+</tbody>
+</table>
+<p>If <code>outcome_horizon = NULL</code> (default), it inherits
+<code>time_scale</code> for backward compatibility.
+<code>outcome_horizon</code> is stored in every fine-tune bundle and
+used automatically at prediction time — no need to specify it when
+calling <code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code>.</p>
 <hr>
+</div>
 </div>
 <div class="section level3">
 <h3 id="hardware-device">Hardware: <code>device</code><a class="anchor" aria-label="anchor" href="#hardware-device"></a>
@@ -889,24 +950,32 @@ A few parameters behave differently at fine-tune time:</p>
 fine-tune config is ignored.</td>
 </tr>
 <tr class="even">
+<td><code>outcome_horizon</code></td>
+<td>
+<strong>Fine-tune only.</strong> Sets the ODE prediction window
+length independently of <code>time_scale</code>. Stored in the fine-tune
+bundle; read automatically by <code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code>. Defaults
+to <code>time_scale</code> if not set.</td>
+</tr>
+<tr class="odd">
 <td><code>include_unk</code></td>
 <td>Inherited from the pretrained bundle vocabulary.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>include_cls_sep</code></td>
 <td>Inherited from the pretrained bundle vocabulary.</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>block_size</code></td>
 <td>Can be increased at fine-tune time (e.g. 256 → 512) to provide a
 longer context.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>learning_rate</code></td>
 <td>Applied uniformly to all parameters. No separate backbone rate or
 scheduler is implemented.</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>epochs</code></td>
 <td>Early stopping is not implemented; set this explicitly.</td>
 </tr>

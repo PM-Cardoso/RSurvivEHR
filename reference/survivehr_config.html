@@ -3,11 +3,11 @@
 survivehr_finetune(), and survivehr_predict().  All parameters have
 sensible defaults suitable for small datasets; see the
 Model architecture vignette for recommended values for larger cohorts
-and the official Gadd et al. (2025) hyperparameter table."><meta property="og:description" content="Returns a named list of hyperparameters consumed by survivehr_pretrain(),
+and the official Gadd et al. (2026) hyperparameter table."><meta property="og:description" content="Returns a named list of hyperparameters consumed by survivehr_pretrain(),
 survivehr_finetune(), and survivehr_predict().  All parameters have
 sensible defaults suitable for small datasets; see the
 Model architecture vignette for recommended values for larger cohorts
-and the official Gadd et al. (2025) hyperparameter table."><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"></head><body>
+and the official Gadd et al. (2026) hyperparameter table."><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -15,7 +15,7 @@ and the official Gadd et al. (2025) hyperparameter table."><link rel="preconnect
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -52,7 +52,7 @@ and the official Gadd et al. (2025) hyperparameter table."><link rel="preconnect
 <code><a href="survivehr_finetune.html">survivehr_finetune()</a></code>, and <code><a href="survivehr_predict.html">survivehr_predict()</a></code>.  All parameters have
 sensible defaults suitable for small datasets; see the
 <em>Model architecture</em> vignette for recommended values for larger cohorts
-and the official Gadd et al. (2025) hyperparameter table.</p>
+and the official Gadd et al. (2026) hyperparameter table.</p>
     </div>
 
     <div class="section level2">
@@ -72,7 +72,8 @@ and the official Gadd et al. (2025) hyperparameter table.</p>
 <span>  device <span class="op">=</span> <span class="st">"auto"</span>,</span>
 <span>  include_unk <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  include_cls_sep <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  time_scale <span class="op">=</span> <span class="fl">1</span></span>
+<span>  time_scale <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  outcome_horizon <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -137,15 +138,29 @@ and the official Gadd et al. (2025) hyperparameter table.</p>
 
 
 <dt id="arg-time-scale">time_scale<a class="anchor" aria-label="anchor" href="#arg-time-scale"></a></dt>
-<dd><p>Controls both the age normalisation and the length of the
-prediction window.  Every raw age is divided by this value before entering
-the model; the survival ODE evaluates over a normalised <code>[0, 1]</code> grid
-that maps back to <code>[0, time_scale]</code> in your original age units.</p><ul><li><p>Use <code>5.0</code> for a 5-year prediction window with ages in years (recommended).</p></li>
-<li><p>Use <code>1.0</code> for a 1-year window with ages in years.</p></li>
-<li><p>Use <code>365.25</code> for a 1-year window with ages in days.</p></li>
-<li><p>Use <code>1826.25</code> for a 5-year window with ages in days.</p></li>
-</ul><p>Stored automatically in every model bundle; no need to supply at prediction time.
-Must be the same across pretrain, fine-tune, and prediction.</p></dd>
+<dd><p>Age normalisation divisor for the backbone transformer.
+  Every raw age is divided by this value before entering the model:
+  <code>age_norm = raw_age / time_scale</code>.  Must be consistent between
+  pre-training and fine-tuning (inherited automatically from the pretrained
+  bundle).  Does <strong>not</strong> control the prediction window — use
+  <code>outcome_horizon</code> for that.</p><ul><li><p><code>1.0</code> (default) — ages in years, backbone sees plain year values.</p></li>
+<li><p><code>365.25</code> — ages in days, backbone sees normalised fractions.</p></li>
+</ul></dd>
+
+
+<dt id="arg-outcome-horizon">outcome_horizon<a class="anchor" aria-label="anchor" href="#arg-outcome-horizon"></a></dt>
+<dd><p>Length of the ODE prediction window in the same raw
+  age units as the <code>age</code> column.  The survival ODE integrates over a
+  normalised <code>[0, 1]</code> grid that maps back to
+  <code>[0, outcome_horizon]</code> in raw age units.  Can differ freely from
+  <code>time_scale</code> — this is what makes it possible to use year-by-year
+  age normalisation (<code>time_scale = 1.0</code>) while producing a 5-year risk
+  (<code>outcome_horizon = 5.0</code>).</p><ul><li><p><code>NULL</code> (default) — inherits <code>time_scale</code> (backward compatible).</p></li>
+<li><p><code>5.0</code> — 5-year prediction window when ages are in years.</p></li>
+<li><p><code>1.0</code> — 1-year prediction window when ages are in years.</p></li>
+<li><p><code>1826.25</code> — 5-year window when ages are in days.</p></li>
+</ul><p>Fine-tune only; ignored at pre-training.  Stored in the fine-tune bundle
+  and used automatically at prediction time.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -155,15 +170,20 @@ Must be the same across pretrain, fine-tune, and prediction.</p></dd>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Minimal config for a 5-year prediction window (ages in years)</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Year-by-year backbone normalisation with a 5-year prediction window</span></span></span>
 <span class="r-in"><span><span class="va">cfg</span> <span class="op">&lt;-</span> <span class="fu">survivehr_config</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  block_size <span class="op">=</span> <span class="fl">64</span>, n_layer <span class="op">=</span> <span class="fl">2</span>, n_head <span class="op">=</span> <span class="fl">2</span>, n_embd <span class="op">=</span> <span class="fl">64</span>,</span></span>
-<span class="r-in"><span>  epochs <span class="op">=</span> <span class="fl">1</span>, batch_size <span class="op">=</span> <span class="fl">4</span>, time_scale <span class="op">=</span> <span class="fl">5.0</span></span></span>
+<span class="r-in"><span>  epochs <span class="op">=</span> <span class="fl">1</span>, batch_size <span class="op">=</span> <span class="fl">4</span>,</span></span>
+<span class="r-in"><span>  time_scale <span class="op">=</span> <span class="fl">1.0</span>,        <span class="co"># backbone: ages enter model as plain year values</span></span></span>
+<span class="r-in"><span>  outcome_horizon <span class="op">=</span> <span class="fl">5.0</span>    <span class="co"># ODE: cdf_last = 5-year risk</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">cfg</span><span class="op">$</span><span class="va">surv_layer</span>   <span class="co"># "competing-risk"</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "competing-risk"</span>
-<span class="r-in"><span><span class="va">cfg</span><span class="op">$</span><span class="va">time_scale</span>   <span class="co"># 5.0</span></span></span>
+<span class="r-in"><span><span class="va">cfg</span><span class="op">$</span><span class="va">outcome_horizon</span>  <span class="co"># 5</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 5</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Both default to 1.0 if outcome_horizon is omitted (backward compatible)</span></span></span>
+<span class="r-in"><span><span class="va">cfg2</span> <span class="op">&lt;-</span> <span class="fu">survivehr_config</span><span class="op">(</span>time_scale <span class="op">=</span> <span class="fl">1.0</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">cfg2</span><span class="op">$</span><span class="va">outcome_horizon</span>  <span class="co"># NULL -&gt; inherits time_scale in the backend</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -230,7 +230,8 @@ training functions.</p>
 <span>  batch_size    <span class="op">=</span> <span class="fl">4</span>,</span>
 <span>  surv_layer    <span class="op">=</span> <span class="st">"competing-risk"</span>,  <span class="co"># or "single-risk" — see Section 5</span></span>
 <span>  value_weight  <span class="op">=</span> <span class="fl">0.1</span>,  <span class="co"># weight for value regression loss (0 = disabled)</span></span>
-<span>  time_scale    <span class="op">=</span> <span class="fl">5.0</span>   <span class="co"># prediction window = 5 years (ages are in years)</span></span>
+<span>  time_scale    <span class="op">=</span> <span class="fl">1.0</span>   <span class="co"># backbone normalisation: age / 1.0 — keeps year values as-is</span></span>
+<span>  <span class="co"># outcome_horizon is set per fine-tune call (e.g. 5.0 for 5-year risk)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Key parameters:</p>
 <table class="table">
@@ -258,15 +259,25 @@ outcome-level head is controlled by <code>risk_model</code> in
 <tr class="odd">
 <td><code>time_scale</code></td>
 <td>
-<strong>Sets both the age normalisation divisor and the prediction
-window length.</strong> Ages are divided by this value before entering
-the model; the survival ODE evaluates over a normalised [0, 1] grid
-mapping back to [0, <code>time_scale</code>] in your age units. Use
-<code>5.0</code> for a 5-year window with ages in years,
-<code>1.0</code> for 1-year. Stored in every model bundle —
-<code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code> reads it automatically.</td>
+<strong>Backbone age normalisation only.</strong> Every raw event
+age is divided by this before entering the model
+(<code>age_norm = raw_age / time_scale</code>). Use <code>1.0</code>
+(default) when ages are in years. Stored in the pretrained bundle and
+<strong>inherited automatically</strong> at fine-tune time — do not set
+it in a fine-tune config.</td>
 </tr>
 <tr class="even">
+<td><code>outcome_horizon</code></td>
+<td>
+<strong>Fine-tune only.</strong> Length of the ODE prediction window
+in the same units as <code>age</code>. The survival ODE integrates from
+0 to <code>outcome_horizon</code>, so <code>cdf_last</code> = risk at
+that horizon. Can differ freely from <code>time_scale</code> —
+e.g. <code>time_scale = 1.0</code> (year normalisation) with
+<code>outcome_horizon = 5.0</code> (5-year risk). Defaults to
+<code>time_scale</code> if not set.</td>
+</tr>
+<tr class="odd">
 <td><code>include_unk</code></td>
 <td>If <code>TRUE</code> (default), a <code>&lt;UNK&gt;</code> token is
 reserved for unseen events at prediction time.</td>
@@ -464,7 +475,8 @@ the input features.</p>
 <span><span class="va">cfg_cr</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_config.html">survivehr_config</a></span><span class="op">(</span></span>
 <span>  block_size <span class="op">=</span> <span class="fl">64</span>, n_layer <span class="op">=</span> <span class="fl">2</span>, n_head <span class="op">=</span> <span class="fl">2</span>, n_embd <span class="op">=</span> <span class="fl">64</span>,</span>
 <span>  dropout <span class="op">=</span> <span class="fl">0</span>, learning_rate <span class="op">=</span> <span class="fl">3e-4</span>, epochs <span class="op">=</span> <span class="fl">10</span>, batch_size <span class="op">=</span> <span class="fl">4</span>,</span>
-<span>  surv_layer <span class="op">=</span> <span class="st">"competing-risk"</span></span>
+<span>  surv_layer <span class="op">=</span> <span class="st">"competing-risk"</span>,</span>
+<span>  outcome_horizon <span class="op">=</span> <span class="fl">5.0</span>  <span class="co"># 5-year prediction window (time_scale=1.0 inherited from pt)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">ft_cr</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_finetune.html">survivehr_finetune</a></span><span class="op">(</span></span>
@@ -510,7 +522,8 @@ CVD cases; patients 4–6 are right-censored controls.</p>
 <span><span class="va">cfg_sr</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_config.html">survivehr_config</a></span><span class="op">(</span></span>
 <span>  block_size <span class="op">=</span> <span class="fl">64</span>, n_layer <span class="op">=</span> <span class="fl">2</span>, n_head <span class="op">=</span> <span class="fl">2</span>, n_embd <span class="op">=</span> <span class="fl">64</span>,</span>
 <span>  dropout <span class="op">=</span> <span class="fl">0</span>, learning_rate <span class="op">=</span> <span class="fl">3e-4</span>, epochs <span class="op">=</span> <span class="fl">10</span>, batch_size <span class="op">=</span> <span class="fl">4</span>,</span>
-<span>  surv_layer <span class="op">=</span> <span class="st">"competing-risk"</span></span>
+<span>  surv_layer <span class="op">=</span> <span class="st">"competing-risk"</span>,</span>
+<span>  outcome_horizon <span class="op">=</span> <span class="fl">5.0</span>  <span class="co"># 5-year prediction window (time_scale=1.0 inherited from pt)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">ft_sr</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/survivehr_finetune.html">survivehr_finetune</a></span><span class="op">(</span></span>
@@ -666,8 +679,9 @@ point.</p>
 <tr class="odd">
 <td><code>{outcome}_cdf_last</code></td>
 <td>Cumulative incidence at the <strong>end</strong> of the prediction
-window. With <code>time_scale = 5.0</code> this is the estimated 5-year
-risk from the patient’s last recorded event.</td>
+window. <code>cdf_last</code> equals the risk at
+<code>outcome_horizon</code> raw time units from the patient’s last
+recorded event.</td>
 </tr>
 <tr class="even">
 <td><code>{outcome}_auc</code></td>
@@ -743,12 +757,12 @@ measurement.</td>
 </tbody>
 </table>
 <blockquote>
-<p><strong>ODE grid</strong>: the survival head evaluates on 1 000
+<p><strong>ODE grid</strong>: the survival head evaluates on 1 000
 equally-spaced time steps from 0 to 1 in normalised time (0 to
-<code>time_scale</code> in raw units). <code>eval_times</code> values
-are snapped to the nearest grid point, giving a resolution of
-<code>time_scale / 999</code> (≈ 0.005 years with
-<code>time_scale = 5.0</code>).</p>
+<code>outcome_horizon</code> in raw units). <code>eval_times</code>
+values are snapped to the nearest grid point, giving a resolution of
+<code>outcome_horizon / 999</code> (≈ 0.005 years with
+<code>outcome_horizon = 5.0</code>).</p>
 </blockquote>
 </div>
 <div class="section level3">

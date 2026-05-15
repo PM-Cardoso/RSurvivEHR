@@ -1,5 +1,70 @@
 # Changelog
 
+## RSurvivEHR 0.9.0
+
+#### New feature: `outcome_horizon` — independent ODE prediction window
+
+The backbone age normalisation (`time_scale`) and the fine-tune
+prediction window (`outcome_horizon`) are now **two independent
+parameters**.
+
+Previously, a single `time_scale` value was used for both purposes: it
+divided all event ages before they entered the transformer, *and* it
+defined the length of the survival ODE grid at fine-tune time. This
+meant the prediction window was locked to whatever age-normalisation
+divisor was chosen at pre-training, making it impossible to, for
+example, pre-train with year-by-year normalisation (`time_scale = 1.0`)
+and produce 5-year risk curves (`outcome_horizon = 5.0`).
+
+**How to use the new parameter:**
+
+``` r
+
+# Pre-train with year-by-year backbone normalisation
+cfg_pretrain <- survivehr_config(
+  ...,
+  time_scale = 1.0   # backbone: ages enter the model as plain year values
+)
+pt <- survivehr_pretrain(events, static, cfg_pretrain)
+
+# Fine-tune for a 5-year risk window — independent of time_scale
+cfg_ft <- survivehr_config(
+  ...,
+  outcome_horizon = 5.0  # ODE: cdf_last = 5-year risk from last event
+  # time_scale not needed — inherited automatically from pretrained bundle
+)
+ft <- survivehr_finetune(events_ft, targets, "CVD", config = cfg_ft,
+                         pretrained_model = pt)
+```
+
+**Backward compatibility:** if `outcome_horizon` is not set, it defaults
+to `time_scale` — existing workflows continue to work without
+modification. `outcome_horizon` is stored in every fine-tune bundle and
+read automatically at prediction time.
+
+**Details:**
+
+| What it controls | Parameter | Stage |
+|----|----|----|
+| `age / time_scale` fed to transformer backbone | `time_scale` | Pre-train (locked); fine-tune (inherited) |
+| ODE grid length; `cdf_last` horizon; `eval_times` validation | `outcome_horizon` | Fine-tune only |
+
+- [`survivehr_config()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_config.md):
+  new `outcome_horizon` parameter (default `NULL` → inherits
+  `time_scale`).
+- [`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md):
+  passes `outcome_horizon` to `FineTuneDataset`; stores it in the
+  fine-tune bundle.
+- [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md):
+  `eval_times` values are validated against `outcome_horizon` (not
+  `time_scale`).
+- [`survivehr_save_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.md)
+  /
+  [`survivehr_load_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_load_model.md):
+  `outcome_horizon` is persisted and restored from every `.pt` bundle.
+
+------------------------------------------------------------------------
+
 ## RSurvivEHR 0.8.2
 
 #### Vignette rewrite — model architecture and parameter reference
