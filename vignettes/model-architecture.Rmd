@@ -15,80 +15,211 @@ knitr::opts_chunk$set(
 )
 ```
 
-This vignette explains every configurable parameter in **RSurvivEHR**, why
-it exists, what value the original SurvivEHR authors used in their UK
-primary-care study (7.6 billion events, 23 million patients), and
-guidelines for choosing a value for your own data.
+This vignette is the complete reference for **RSurvivEHR**.  It explains what
+the model does, how every `survivehr_config()` parameter affects training,
+what values the original authors used in their large-scale UK primary-care
+study (Gadd et al., 2026), and how to choose values for your own data.
 
-Upstream defaults are taken directly from the published hyperparameter table
-in Gadd et al. (2025) and from the upstream configuration files
+**Jump to:**
+[How the model works](#how-the-model-works) ·
+[Quick-start configs](#quick-start-configurations) ·
+[Upstream hyperparameters](#upstream-hyperparameters) ·
+[Full config reference](#survivehr_config-full-parameter-reference) ·
+[Architecture](#architecture-block_size-n_layer-n_head-n_embd) ·
+[Regularisation](#regularisation-dropout) ·
+[Optimisation](#optimisation-learning_rate-epochs-batch_size) ·
+[Loss weights](#loss-weights-surv_layer-surv_weight-value_weight) ·
+[Tokenisation](#tokenisation-include_unk-include_cls_sep) ·
+[Time & age](#time--age-time_scale) ·
+[Hardware](#hardware-device) ·
+[Fine-tuning notes](#fine-tuning-notes)
+
+---
+
+## How the model works
+
+SurvivEHR is a **GPT-style decoder-only transformer** pre-trained on sequences
+of clinical events (diagnoses, prescriptions, measurements) via *causal
+language modelling*.  After pre-training, the model encodes the temporal
+structure of a patient's medical history into a dense representation.  A
+**neural-ODE survival head** is then fine-tuned on labelled outcome data
+(target event and age at event) to produce calibrated time-to-event curves.
+
+```
+EHR sequences --> Tokeniser --> Token + positional embedding (RoPE)
+                                              |
+                                  n_layer x NeoGPT block
+                                  (MHA + SwiGLU MLP + Pre-LN)
+                                              |
+                                  Last attended hidden state
+                                              |
+                        +-----------------------------------------+
+                        |  Competing-risk ODE head (one ODE/event)|
+                        |  or                                      |
+                        |  Single-risk ODE head (one ODE)         |
+                        +-----------------------------------------+
+                                              |
+                                  CIF curves per time horizon
+```
+
+### Transformer block (NeoGPT)
+
+RSurvivEHR always uses the **NeoGPT** block, which differs from the original
+nanoGPT block in three ways:
+
+- **Rotary Position Embeddings (RoPE)** — encodes relative token positions
+  inside attention, without a separate positional embedding layer.
+- **SwiGLU activation** — replaces GELU in the MLP for improved gradient flow.
+- **Pre-LN** — LayerNorm is applied *before* each sub-layer (attention and MLP)
+  rather than after, which stabilises training.
+
+### Neural-ODE survival head
+
+The survival head uses the **DeSurv** neural ODE framework.  For the
+**competing-risk** setting, one ODE is instantiated per outcome event, each
+with an encoder MLP, a lightweight ODE right-hand-side network, and a sigmoid
+cumulative incidence function (CIF) output.  For **single-risk**, a single ODE
+produces one survival curve.
+
+The ODE integrates over a normalised time grid $[0, 1]$, which maps back to
+$[0, \texttt{time\_scale}]$ in your original age units (see
+[`time_scale`](#time--age-time_scale)).
+
+### Vocabulary construction
+
+The vocabulary is built automatically during `survivehr_pretrain()` and stored
+inside every model bundle:
+
+1. All unique `event` codes are collected from the events data frame.
+2. Special tokens are prepended at fixed indices:
+   - `<PAD>` → index 0 (always present; `padding_idx = 0`)
+   - `<UNK>` → index 1 (when [`include_unk = TRUE`](#tokenisation-include_unk-include_cls_sep))
+   - `<CLS>` → index 2 (when [`include_cls_sep = TRUE`](#tokenisation-include_unk-include_cls_sep))
+   - `<SEP>` → index 3 (when `include_cls_sep = TRUE`)
+3. Clinical event tokens are assigned indices ≥ 2 (or ≥ 4 with CLS/SEP),
+   ordered by **frequency — most common event first** (lowest index).
+
+At fine-tuning, outcome codes absent from the pre-training vocabulary are
+**automatically appended** and the embedding layer is extended with a
+weight-safe copy from the pre-trained backbone.
+
+---
+
+## Quick-start configurations
+
+Copy the block that best matches your setup.  All parameters not shown use
+their defaults (see [Full config reference](#survivehr_config-full-parameter-reference)).
+
+### Laptop / small dataset (< 5 000 patients)
+
+```{r}
+library(RSurvivEHR)
+
+cfg_small <- survivehr_config(
+  block_size    = 64,
+  n_layer       = 2,
+  n_head        = 2,
+  n_embd        = 64,
+  dropout       = 0.1,    # regularise on small data
+  learning_rate = 3e-4,
+  epochs        = 20,
+  batch_size    = 8,
+  surv_layer    = "competing-risk",
+  time_scale    = 5.0     # 5-year prediction window
+)
+```
+
+### Workstation / medium dataset (5 000 – 50 000 patients)
+
+```{r}
+cfg_medium <- survivehr_config(
+  block_size    = 128,
+  n_layer       = 4,
+  n_head        = 4,
+  n_embd        = 256,
+  dropout       = 0.0,
+  learning_rate = 3e-4,
+  epochs        = 10,
+  batch_size    = 32,
+  surv_layer    = "competing-risk",
+  time_scale    = 5.0
+)
+```
+
+### HPC / large dataset — upstream CPRD settings (> 100 000 patients)
+
+```{r}
+# Pre-training
+cfg_pretrain <- survivehr_config(
+  block_size    = 256,
+  n_layer       = 6,
+  n_head        = 6,
+  n_embd        = 384,
+  dropout       = 0.0,
+  learning_rate = 3e-4,
+  epochs        = 10,
+  batch_size    = 64,
+  surv_layer    = "competing-risk",
+  time_scale    = 5.0
+)
+
+# Fine-tuning (larger context window, increased lr and batch size)
+cfg_finetune <- survivehr_config(
+  block_size    = 512,
+  n_layer       = 6,
+  n_head        = 6,
+  n_embd        = 384,
+  dropout       = 0.0,
+  learning_rate = 5e-4,
+  epochs        = 20,
+  batch_size    = 512,
+  surv_layer    = "competing-risk"
+  # time_scale inherited automatically from the pretrained bundle
+)
+```
+
+---
+
+## Upstream hyperparameters
+
+The table below shows the hyperparameters used in the original CPRD study
+(Gadd et al., 2026) alongside the corresponding `survivehr_config()` parameter.
+Upstream defaults are also available in the published configuration files
 <a href="https://github.com/cwlgadd/SurvivEHR/blob/main/examples/modelling/SurvivEHR/confs/config_CompetingRisk11M.yaml" target="_blank" rel="noopener noreferrer"><code>config_CompetingRisk11M.yaml</code></a>
 and
-<a href="https://github.com/cwlgadd/SurvivEHR/blob/main/examples/modelling/SurvivEHR/confs/config_SingleRisk.yaml" target="_blank" rel="noopener noreferrer"><code>config_SingleRisk.yaml</code></a>
-in the `cwlgadd/SurvivEHR` repository.
+<a href="https://github.com/cwlgadd/SurvivEHR/blob/main/examples/modelling/SurvivEHR/confs/config_SingleRisk.yaml" target="_blank" rel="noopener noreferrer"><code>config_SingleRisk.yaml</code></a>.
+
+| Component | Hyperparameter | `survivehr_config()` param | Pre-training | Fine-tuning |
+|---|---|---|---|---|
+| **Architecture** | Layers | [`n_layer`](#architecture-block_size-n_layer-n_head-n_embd) | 6 | 6 |
+| | Attention heads | [`n_head`](#architecture-block_size-n_layer-n_head-n_embd) | 6 | 6 |
+| | Hidden size | [`n_embd`](#architecture-block_size-n_layer-n_head-n_embd) | 384 | 384 |
+| | Max sequence length | [`block_size`](#architecture-block_size-n_layer-n_head-n_embd) | 256 | 512 |
+| **Regularisation** | Dropout | [`dropout`](#regularisation-dropout) | 0.0 | 0.0 |
+| **Optimisation** | Batch size | [`batch_size`](#optimisation-learning_rate-epochs-batch_size) | 64 | 512 |
+| | Epochs | [`epochs`](#optimisation-learning_rate-epochs-batch_size) | 10 | 20 |
+| | Optimiser | AdamW (fixed) | AdamW | AdamW |
+| | Learning rate | [`learning_rate`](#optimisation-learning_rate-epochs-batch_size) | 3 × 10^−4 | 5 × 10^−4 |
+| **Loss weights** | Backbone survival head | [`surv_layer`](#loss-weights-surv_layer-surv_weight-value_weight) | `"competing-risk"` | `"competing-risk"` |
+| | Survival loss weight | [`surv_weight`](#loss-weights-surv_layer-surv_weight-value_weight) | 1.0 | 1.0 |
+| | Value regression weight | [`value_weight`](#loss-weights-surv_layer-surv_weight-value_weight) | 0.1 | — |
+| **Tokenisation** | Reserve `<UNK>` token | [`include_unk`](#tokenisation-include_unk-include_cls_sep) | `TRUE` | (inherited) |
+| | Add `<CLS>`/`<SEP>` tokens | [`include_cls_sep`](#tokenisation-include_unk-include_cls_sep) | `FALSE` | (inherited) |
+| **Time / age** | Age normalisation & prediction window | [`time_scale`](#time--age-time_scale) | 1.0 | (inherited) |
+| **Hardware** | Compute device | [`device`](#hardware-device) | `"auto"` (GPU) | `"auto"` (GPU) |
+
+> **Note on the optimiser:** the upstream CPRD study used separate backbone
+> and head learning rates, LR schedulers, warmup steps, and early stopping.
+> The RSurvivEHR backend uses a **single AdamW optimiser** over all parameters
+> with a constant learning rate — no scheduler or early stopping is implemented.
+> The `learning_rate` you set applies uniformly to the whole model.
 
 ---
 
-## Overview
+## `survivehr_config()` — full parameter reference
 
-SurvivEHR is a GPT-style transformer pre-trained on sequences of clinical
-events (diagnoses, prescriptions, measurements, ...) via *causal language
-modelling*.  After pre-training the model "understands" the temporal
-structure of medical histories.  A neural-ODE survival head is then
-fine-tuned on labelled outcome data (target event and age at event) to
-produce calibrated time-to-event curves.
-
-```
-EHR sequences --> Tokeniser --> Token + positional embedding
-                                        |
-                            n_layer x NeoGPT block  (MHA + MLP + LayerNorm)
-                                        |
-                            Last attended hidden state
-                                        |
-                +-----------------------+----------------------+
-                |  Competing-risk ODE head (one ODE per event)|
-                |  or                                         |
-                |  Single-risk ODE head (one ODE)             |
-                +---------------------------------------------+
-                                        |
-                            CDF curves per time horizon
-```
-
----
-
-## Upstream hyperparameters (Gadd et al., 2025)
-
-The following table reproduces the hyperparameters used in the original
-CPRD study.  These are the values to target when you have a large dataset
-and GPU resources.
-
-| Component | Hyperparameter | Pre-training | Fine-tuning |
-|---|---|---|---|
-| **Architecture** | Layers (`n_layer`) | 6 | 6 |
-| | Attention heads (`n_head`) | 6 | 6 |
-| | Hidden size (`n_embd`) | 384 | 384 |
-| | Max sequence length (`block_size`) | 256 | 512 |
-| | Context window | Repeated measurements | All last unique |
-| | Global diagnoses | False | Append to context |
-| **Optimisation** | Batch size | 64 | 512 |
-| | Epochs | 10 | 20 |
-| | Early stopping | False | True |
-| | Optimiser | AdamW | AdamW |
-| | Backbone learning rate | 3 x 10^-4 | 5 x 10^-5 |
-| | Head learning rate | 3 x 10^-4 | 5 x 10^-4 |
-| | Scheduler | Linear warmup + cosine annealing | Reduce on plateau |
-| | Warmup steps | 10,000 | 0 |
-| | Warm restarts | True | False |
-
-> **Note on context window (fine-tuning):** during fine-tuning the block
-> size is extended to 512 and each patient's context is formed from the
-> *last unique* occurrence of each event rather than allowing repeated
-> measurements.  Global diagnoses (conditions recorded before the context
-> window) are *appended* to the context rather than being dropped.
-
----
-
-## `survivehr_config()` -- full parameter reference
+The annotated call below shows every parameter with its RSurvivEHR default
+and a note on the upstream value.
 
 ```{r}
 library(RSurvivEHR)
@@ -101,27 +232,27 @@ cfg <- survivehr_config(
   n_embd        = 256,       # embedding dimension;     upstream: 384
 
   # -- Regularisation ------------------------------------------------------
-  dropout       = 0.0,       # applied before attention and after MLP
+  dropout       = 0.0,       # applied to attention, MLP residuals; upstream: 0.0
 
   # -- Optimisation --------------------------------------------------------
-  learning_rate = 3e-4,      # AdamW learning rate; upstream pre-train backbone: 3e-4
+  learning_rate = 3e-4,      # single AdamW LR for all parameters
   epochs        = 1,         # upstream pre-train: 10;  fine-tune: 20
   batch_size    = 16,        # upstream pre-train: 64;  fine-tune: 512
 
-  # -- Survival head -------------------------------------------------------
-  surv_layer    = "competing-risk",  # or "single-risk"
-  surv_weight   = 1.0,
-  value_weight  = 0.0,
+  # -- Loss weights --------------------------------------------------------
+  surv_layer    = "competing-risk",  # backbone survival head; or "single-risk"
+  surv_weight   = 1.0,       # weight on the survival loss term
+  value_weight  = 0.0,       # weight on value regression loss (upstream pre-train: 0.1)
 
   # -- Tokenisation --------------------------------------------------------
-  include_unk     = TRUE,
-  include_cls_sep = FALSE,
+  include_unk     = TRUE,    # reserve <UNK> for unseen events; upstream: TRUE
+  include_cls_sep = FALSE,   # add <CLS>/<SEP> tokens; upstream: FALSE (GPT-style)
 
   # -- Age / time handling -------------------------------------------------
-  time_scale    = 1.0,       # divide all raw ages by this number
+  time_scale    = 1.0,       # age normalisation divisor and prediction window length
 
   # -- Hardware ------------------------------------------------------------
-  device        = "auto"
+  device        = "auto"     # "auto", "cpu", or "cuda"
 )
 ```
 
@@ -139,11 +270,6 @@ The **context window** is the maximum number of tokens (clinical events)
 seen by the model at once.  Sequences longer than `block_size` are
 *right-truncated* -- only the most recent events are retained.  Sequences
 shorter than `block_size` are *left-padded* with `<PAD>` tokens (index 0).
-
-Upstream pre-training used `block_size = 256` with *repeated measurements*
-(e.g. two BMI records both retained).  Fine-tuning extended this to `512`
-and switched to *last-unique* context (keeping only the most recent record
-for each event type) plus *global diagnoses* appended at the start.
 
 > **Tip:** set `block_size` to the 95th percentile of sequence lengths in
 > your dataset.
@@ -193,268 +319,171 @@ small datasets (< 10 000 patients).
 
 ---
 
-### `learning_rate`
+### Optimisation: `learning_rate`, `epochs`, `batch_size`
 
-| Stage | Upstream backbone LR | Upstream head LR |
+#### `learning_rate`
+
+| RSurvivEHR default | Upstream pre-training | Upstream fine-tuning |
 |---|---|---|
-| Pre-training | 3 x 10^-4 | 3 x 10^-4 |
-| Fine-tuning  | 5 x 10^-5 | 5 x 10^-4 |
+| `3e-4` | 3 × 10^−4 | 5 × 10^−4 |
 
-The optimiser is **AdamW**.  During fine-tuning the backbone is updated
-with a much smaller rate (5e-5) to preserve pre-trained representations,
-while the new survival head trains faster (5e-4).
+The optimiser is **AdamW**.  The `learning_rate` you supply is applied
+uniformly to all model parameters via a single optimiser — there is no
+separate backbone rate or learning rate schedule in the RSurvivEHR backend.
+The upstream study used a lower backbone rate (5 × 10^−5) during fine-tuning
+to preserve pre-trained weights; this is not currently implemented here.
 
-Pass `learning_rate` to `survivehr_config()` to set the head learning rate.
-
----
-
-### `epochs`
+#### `epochs`
 
 | RSurvivEHR default | Upstream pre-training | Upstream fine-tuning |
 |---|---|---|
 | `1` | `10` | `20` |
 
-Scale up proportionally for smaller datasets.
+Number of full passes over the training data.  Early stopping is not
+implemented — set `epochs` explicitly.  Scale up proportionally for smaller
+datasets where each epoch sees fewer gradient steps.
 
----
-
-### `batch_size`
+#### `batch_size`
 
 | RSurvivEHR default | Upstream pre-training | Upstream fine-tuning |
 |---|---|---|
 | `16` | `64` | `512` |
 
-The upstream fine-tuning batch of 512 requires gradient accumulation on
-multi-GPU hardware.  On a single laptop GPU (8 GB), `batch_size = 16-32`
-is safe with `block_size = 128`.
+The upstream fine-tuning batch of 512 requires multi-GPU hardware.  On a
+single laptop GPU (8 GB VRAM), `batch_size = 16`–`32` with `block_size = 128`
+is a safe starting point.
 
 ---
 
-### Optimisation scheduler
+### Loss weights: `surv_layer`, `surv_weight`, `value_weight`
 
-| Stage | Scheduler | Warmup steps | Warm restarts |
-|---|---|---|---|
-| Pre-training | Linear warmup + cosine annealing | 10,000 | True |
-| Fine-tuning | ReduceLROnPlateau | 0 | False |
-
-Early stopping is **disabled** during pre-training and **enabled**
-(patience = 30 validation checks) during fine-tuning.
-
----
-
-### `surv_layer` -- backbone time-to-next-event head
+#### `surv_layer` — backbone time-to-next-event head
 
 SurvivEHR pre-training goes beyond standard causal language modelling
-(predicting *which* event comes next).  The backbone also trains a
-survival head to predict *when* the next event occurs, using the age at
-each sequence position as the time target.  `surv_layer` controls how
-that timing problem is framed:
+(predicting *which* event is next).  The backbone also trains a survival
+head to predict *when* the next event occurs, using age as the time axis.
+`surv_layer` controls how that timing problem is framed:
 
 | Value | Description |
 |---|---|
-| `"competing-risk"` (default) | Treats each position as a genuine competing-risk problem: only one event can be next, so all other vocabulary events are implicitly competing.  One neural ODE per vocabulary token. |
+| `"competing-risk"` (default) | Treats each sequence position as a genuine competing-risk problem: only one event can be next, so all other vocabulary events implicitly compete.  One neural ODE is instantiated per vocabulary token. |
 | `"single-risk"` | Fits one independent ODE per vocabulary token in a 1-vs-all fashion, treating all other events as censored rather than competing. |
 
-> **Used in both pre-training and fine-tuning** — the backbone constructor
-> reads `cfg.head.SurvLayer` at both stages, so the architecture must remain
-> consistent.  The **outcome-level** head that produces patient predictions
-> is controlled separately by the `risk_model` argument to
-> `survivehr_finetune()`.  Because they are entirely separate `nn.Module`
-> objects, `surv_layer` and `risk_model` **can differ** — e.g. pretrain with
+> **Important:** `surv_layer` controls the *backbone* head used in both
+> pre-training and fine-tuning — the backbone architecture must remain
+> consistent across both stages.  The *outcome-level* head that produces
+> patient predictions is controlled separately by the `risk_model` argument
+> to `survivehr_finetune()`.  Because they are entirely separate `nn.Module`
+> objects, `surv_layer` and `risk_model` **can differ** — e.g. pre-train with
 > `surv_layer = "competing-risk"` and fine-tune with
-> `risk_model = "single-risk"` with no conflict.
+> `risk_model = "single-risk"` without conflict.
 
-The upstream config uses the abbreviated codes `"cr"` and `"sr"` -- both
-are also accepted by RSurvivEHR.
+The upstream config uses the abbreviated codes `"cr"` and `"sr"` — both are
+also accepted by RSurvivEHR.
+
+#### `surv_weight` and `value_weight`
+
+The total pre-training loss is a weighted sum of three terms:
+
+| Loss term | Weight parameter | Default | Description |
+|---|---|---|---|
+| Causal LM | — (fixed at 1) | 1.0 | Predict the *identity* of the next event token. |
+| Backbone survival | `surv_weight` | `1.0` | Predict *when* the next event occurs (neural ODE). |
+| Value regression | `value_weight` | `0.0` | Predict the *numeric value* of measurement events (e.g. BMI). |
+
+The upstream CPRD study used `surv_weight = 1.0` and `value_weight = 0.1` for
+models that also learned measurement magnitudes.  Set `value_weight > 0` only
+if your events data frame includes meaningful numeric `value` entries.
 
 ---
 
-### `surv_weight` and `value_weight`
+### Tokenisation: `include_unk`, `include_cls_sep`
 
-| Loss term | Weight | Description |
-|---|---|---|
-| Causal LM (next-event prediction) | 1 (fixed) | Predict the next token. |
-| Survival | `surv_weight` (default `1.0`) | Predict whether / when the next event occurs. |
-| Value regression | `value_weight` (default `0.0`) | Predict the numeric value of measurement events. |
+> **Pre-training only.**  Both settings are fixed when the vocabulary is built
+> during `survivehr_pretrain()` and stored in the model bundle.  Values in a
+> fine-tune config are ignored.
 
-Upstream used `surv_weight = 1`, `value_weight = 0.1` for models that
-also learned measurement magnitudes (e.g. BMI, blood pressure).
+#### `include_unk`
 
----
-
-### `include_unk`
-
-> **Pre-training only.** This setting is fixed when the vocabulary is built
-> during `survivehr_pretrain()` and stored in the bundle.  The value in a
-> fine-tune config is ignored.
-
-| RSurvivEHR default | Notes |
+| RSurvivEHR default | Upstream |
 |---|---|
-| `TRUE` | Always recommended for production use. |
+| `TRUE` | `TRUE` |
 
-Reserves `<UNK>` (index 1).  Any unseen event code at fine-tune /
-prediction time is silently mapped to `<UNK>`.
+Reserves `<UNK>` at index 1.  Any event code seen at fine-tune or prediction
+time that was absent from the pre-training vocabulary is silently mapped to
+`<UNK>`.  Always leave `TRUE` for production use.
 
----
+#### `include_cls_sep`
 
-### `include_cls_sep`
-
-> **Pre-training only.** Fixed at vocabulary build time and stored in the
-> bundle.  The value in a fine-tune config is ignored.
-
-| RSurvivEHR default | Notes |
+| RSurvivEHR default | Upstream |
 |---|---|
-| `FALSE` | The original SurvivEHR model does not use CLS/SEP tokens. |
+| `FALSE` | `FALSE` |
 
-Set `TRUE` for BERT / BEHRT-style sequences.  Not used in the upstream
-GPT-style pre-training.
+Prepends `<CLS>` and appends `<SEP>` around each patient sequence, following
+the BERT / BEHRT convention.  Not used in the upstream GPT-style pre-training.
+Set `TRUE` only if you are adapting RSurvivEHR for BERT-style models.
 
 ---
 
-### `time_scale`
+### Time & age: `time_scale`
 
-All raw ages are divided by `time_scale` before entering the model.
+All raw patient ages are divided by `time_scale` before entering the model.
+The survival ODE then integrates over a normalised grid $[0, 1]$, which maps
+back to $[0, \texttt{time\_scale}]$ in your original age units.  This means
+`time_scale` simultaneously controls **age normalisation** and the
+**prediction window length**.
+
 **Must be consistent** across pre-training, fine-tuning, and prediction.
+The value is stored in every model bundle and reused automatically — you do
+**not** need to repeat it in a fine-tune config.
 
-- **Pre-training**: used only for age normalisation — there is no prediction window at this stage.
-- **Fine-tuning**: also defines the prediction window.  The ODE integrates over $[0,1]$ which corresponds to $[0, \texttt{time\_scale}]$ raw time units, so `time_scale = 5.0` means the survival curves cover a 5-year window.  The value is stored in the pretrained bundle and reused automatically — you do **not** need to repeat it in a fine-tune config.
-
-| Age unit | Recommended `time_scale` |
-|---|---|
-| Years (e.g. `50.0`) | `1.0` or the desired horizon in years (e.g. `5.0`) |
-| Days since birth (e.g. `18262` ≈ 50 years) | `365.25` |
+| Age unit | Desired window | Recommended `time_scale` |
+|---|---|---|
+| Years (e.g. `50.0`) | 1 year | `1.0` |
+| Years (e.g. `50.0`) | 5 years | `5.0` |
+| Days since birth (e.g. `18262`) | 1 year | `365.25` |
+| Days since birth (e.g. `18262`) | 5 years | `1826.25` |
 
 ---
 
-### `device`
+### Hardware: `device`
 
 | Value | Behaviour |
 |---|---|
-| `"auto"` (default) | GPU (CUDA) if available, else CPU. |
-| `"cpu"` | Force CPU. |
-| `"cuda"` | Force GPU -- error if unavailable. |
+| `"auto"` (default) | Uses GPU (CUDA) if available, otherwise falls back to CPU. |
+| `"cpu"` | Forces CPU computation. |
+| `"cuda"` | Forces GPU — raises an error if no CUDA device is available. |
 
 ---
 
-## Architecture notes
+## Fine-tuning notes
 
-### NeoGPT block
+The same `survivehr_config()` object is passed to both `survivehr_pretrain()`
+and `survivehr_finetune()`.  A few parameters behave differently at fine-tune
+time:
 
-RSurvivEHR always uses the **NeoGPT** block (`block_type = "Neo"`):
+| Parameter | Fine-tuning behaviour |
+|---|---|
+| `time_scale` | Inherited automatically from the pretrained bundle; value in fine-tune config is ignored. |
+| `include_unk` | Inherited from the pretrained bundle vocabulary. |
+| `include_cls_sep` | Inherited from the pretrained bundle vocabulary. |
+| `block_size` | Can be increased at fine-tune time (e.g. 256 → 512) to provide a longer context. |
+| `learning_rate` | Applied uniformly to all parameters. No separate backbone rate or scheduler is implemented. |
+| `epochs` | Early stopping is not implemented; set this explicitly. |
 
-- **Rotary Position Embeddings (RoPE)** inside attention.
-- **SwiGLU** activation in the MLP.
-- **Pre-LN** (LayerNorm before each sub-layer).
+The following Python-side options exist in the upstream backend but are **not
+yet exposed through `survivehr_config()`** in RSurvivEHR:
 
-### Neural-ODE survival head
-
-For the **competing-risk** head, one ODE is instantiated per outcome event,
-each with an encoder MLP, a lightweight ODE right-hand-side network, and a
-sigmoid CIF output.  For the **single-risk** head, a single ODE produces
-one survival curve.
-
-### Vocabulary construction
-
-Built automatically during `survivehr_pretrain()`:
-
-1. Unique `event` codes collected from the events data frame.
-2. Special tokens prepended at fixed indices:
-   - `<PAD>` -> index 0 (always; `padding_idx = 0`)
-   - `<UNK>` -> index 1 (when `include_unk = TRUE`)
-   - `<CLS>` -> index 2 (when `include_cls_sep = TRUE`)
-   - `<SEP>` -> index 3 (when `include_cls_sep = TRUE`)
-3. Clinical tokens assigned indices >= 2 (or >= 4 with CLS/SEP),
-   ordered by **frequency — most common event first** (lowest index).
-
-At fine-tuning, outcome codes absent from the vocab are **automatically
-appended** and the embedding layer is extended using a weight-safe copy
-from the pre-trained backbone.
-
----
-
-## Recommended configurations
-
-### Laptop / small dataset (< 5 000 patients)
-
-```{r}
-cfg_small <- survivehr_config(
-  block_size    = 64,
-  n_layer       = 2,
-  n_head        = 2,
-  n_embd        = 64,
-  dropout       = 0.1,
-  learning_rate = 3e-4,
-  epochs        = 20,
-  batch_size    = 8,
-  surv_layer    = "competing-risk"
-)
-```
-
-### Workstation / medium dataset (5 000--50 000 patients)
-
-```{r}
-cfg_medium <- survivehr_config(
-  block_size    = 128,
-  n_layer       = 4,
-  n_head        = 4,
-  n_embd        = 256,
-  dropout       = 0.0,
-  learning_rate = 3e-4,
-  epochs        = 10,
-  batch_size    = 32,
-  surv_layer    = "competing-risk"
-)
-```
-
-### HPC / large dataset -- upstream CPRD settings (> 100 000 patients)
-
-```{r}
-# Pre-training
-cfg_pretrain <- survivehr_config(
-  block_size    = 256,
-  n_layer       = 6,
-  n_head        = 6,
-  n_embd        = 384,
-  dropout       = 0.0,
-  learning_rate = 3e-4,
-  epochs        = 10,
-  batch_size    = 64,
-  surv_layer    = "competing-risk"
-)
-
-# Fine-tuning (larger block size, adjusted lr and batch_size)
-cfg_finetune <- survivehr_config(
-  block_size    = 512,
-  n_layer       = 6,
-  n_head        = 6,
-  n_embd        = 384,
-  dropout       = 0.0,
-  learning_rate = 5e-4,   # head lr; backbone uses 5e-5 internally
-  epochs        = 20,
-  batch_size    = 512,
-  surv_layer    = "competing-risk"
-)
-```
-
----
-
-## Fine-tuning-specific options
-
-| Option | Upstream fine-tune default | Description |
+| Option | Upstream default | Description |
 |---|---|---|
-| Backbone learning rate | `5e-5` | Preserve pre-trained weights. |
-| Head learning rate | `5e-4` | Pass as `learning_rate` in `survivehr_config()`. |
-| Early stopping | Enabled (patience 30) | Stops when validation loss plateaus. |
-| Scheduler | ReduceLROnPlateau | Reduces backbone LR on plateau. |
-| `PEFT.method` | `NULL` (full fine-tune) | Options: `"fix"` (frozen backbone), `"adapter"` (LoRA-style). |
-| `PEFT.adapter_dim` | `8` | Bottleneck dimension for the adapter module. |
-| `compression_layer` | `FALSE` | LayerNorm -> Linear -> GELU -> Dropout between backbone and head. |
-| `llrd` | `NULL` (disabled) | Layer-wise learning rate decay (float 0-1). |
+| PEFT / adapter | Full fine-tune | `"fix"` freezes the backbone; `"adapter"` adds LoRA-style adapter layers. |
+| Layer-wise LR decay | Disabled | Applies exponentially smaller learning rates toward the input layers. |
 
 ---
 
 ## References
 
-Gadd, C. et al. (2025). *SurvivEHR: Transformer-based survival analysis on
-electronic health records*. medRxiv.
-<a href="https://doi.org/10.1101/2025.08.04.25332916" target="_blank" rel="noopener noreferrer">doi:10.1101/2025.08.04.25332916</a>
+Gadd, C., Gokhale, K., Acharya, A. et al. (2026). *SurvivEHR: a competing
+risks, time-to-event foundation model for multiple long-term conditions from
+primary care electronic health records.* npj Digital Medicine.
+<a href="https://doi.org/10.1038/s41746-026-02709-z" target="_blank" rel="noopener noreferrer">doi:10.1038/s41746-026-02709-z</a>

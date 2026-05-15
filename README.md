@@ -67,7 +67,7 @@ new events ────────▶ survivehr_predict()  ──▶ per-patien
   respectively).  Uppercase alternatives (`PATIENT_ID`, `EVENT`,
   `DAYS_SINCE_BIRTH`) are also accepted.
 - **`static_covariates`** column names are fully user-defined — use whatever your data has
-  (`SEX`, `IMD`, `year_of_birth`, …). Categorical columns are one-hot encoded automatically;
+  (`sex`, `imd`, `year_of_birth`, …). Categorical columns are one-hot encoded automatically;
   numeric columns pass through unchanged.
 - Continuous readings (blood pressure, HbA1c, BMI, etc.) go in the `value` column alongside
   the event that recorded them. Rows without a reading should be `NA`.
@@ -124,6 +124,7 @@ Full documentation, vignettes, and configuration reference at
 
 If you use RSurvivEHR in your research, please cite the original SurvivEHR paper:
 
-> Gadd, C. et al. (2025). *SurvivEHR: Transformer-based survival analysis on
-> electronic health records*. medRxiv.
-> <a href="https://doi.org/10.1101/2025.08.04.25332916" target="_blank" rel="noopener noreferrer">doi:10.1101/2025.08.04.25332916</a>
+> Gadd, C., Gokhale, K., Acharya, A. et al. (2026). *SurvivEHR: a competing risks, time-to-event
+> foundation model for multiple long-term conditions from primary care electronic health records*.
+> npj Digital Medicine.
+> <a href="https://doi.org/10.1038/s41746-026-02709-z" target="_blank" rel="noopener noreferrer">doi:10.1038/s41746-026-02709-z</a>

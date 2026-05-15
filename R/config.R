@@ -4,7 +4,7 @@
 #' `survivehr_finetune()`, and `survivehr_predict()`.  All parameters have
 #' sensible defaults suitable for small datasets; see the
 #' *Model architecture* vignette for recommended values for larger cohorts
-#' and the official Gadd et al. (2025) hyperparameter table.
+#' and the official Gadd et al. (2026) hyperparameter table.
 #'
 #' @param block_size Sequence length after padding/truncation.
 #' @param n_layer Number of transformer blocks.
