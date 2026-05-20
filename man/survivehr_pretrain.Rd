@@ -13,7 +13,9 @@ survivehr_pretrain(
 }
 \arguments{
 \item{events}{A \code{data.frame} with columns \code{patient_id}, \code{event}, \code{age}
-(and optionally \code{value}).  Validated with
+(and optionally \code{value}) — lowercase is the preferred canonical form;
+uppercase aliases \code{PATIENT_ID}, \code{EVENT}, \code{DAYS_SINCE_BIRTH} are accepted
+for backward compatibility.  Validated with
 \code{survivehr_validate_events()} before being passed to Python.}
 
 \item{static_covariates}{An optional \code{data.frame} with \code{patient_id} and
@@ -37,11 +39,16 @@ A named list (model bundle) with elements:
 token IDs (frequency-descending order, most common = smallest ID).}
 \item{\code{inv_vocab}}{Reverse mapping from token IDs to event codes.}
 \item{\code{config}}{The configuration used for training.}
-\item{\code{time_scale}}{The prediction window / age normalisation divisor
-stored in the bundle.}
+\item{\code{time_scale}}{The backbone age normalisation divisor stored in
+the bundle.  Used to normalise context ages before they enter the
+transformer; inherited automatically at fine-tune time.}
 \item{\code{token_policy}}{Token policy flags (\code{include_unk},
 \code{include_cls_sep}).}
 \item{\code{history}}{List of per-epoch training losses.}
+\item{\code{training_duration_secs}}{Wall-clock seconds elapsed during
+training (a single \code{numeric} scalar).  Use this to report and
+compare training times, e.g.
+\code{cat("Pretrain took", round(pt$training_duration_secs, 1), "s\\\\n")}.}
 \item{\code{device}}{String identifying the compute device used
 (e.g. \code{"cpu"} or \code{"cuda:0"}).}
 }
@@ -105,16 +112,16 @@ events_pop <- data.frame(
 )
 static_pop <- data.frame(
   patient_id    = 1:10,
-  SEX           = c("M","F","M","F","M","F","M","F","M","F"),
-  ETHNICITY     = c("White","Asian","White","Black","White",
+  sex           = c("M","F","M","F","M","F","M","F","M","F"),
+  ethnicity     = c("White","Asian","White","Black","White",
                     "Asian","White","White","Black","White"),
-  IMD           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
-  YEAR_OF_BIRTH = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
+  imd           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
+  year_of_birth = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
 )
-# 5-year prediction window; ages are in years
+# Year-by-year backbone normalisation (ages in years → model sees plain year values)
 cfg <- survivehr_config(
   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
-  epochs = 10, batch_size = 4, time_scale = 5.0
+  epochs = 10, batch_size = 4, time_scale = 1.0
 )
 pt <- survivehr_pretrain(events_pop, static_pop, cfg)
 # Vocabulary is frequency-ordered: most-common events get the smallest IDs

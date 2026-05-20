@@ -7,18 +7,20 @@
 survivehr_validate_events(events)
 }
 \arguments{
-\item{events}{A \code{data.frame} with columns:
+\item{events}{A \code{data.frame} with columns (lowercase is the preferred
+canonical form; uppercase aliases are accepted for backward compatibility):
 \describe{
-\item{\code{patient_id}}{Patient identifier (numeric or character).}
-\item{\code{event}}{Clinical event code (character).}
+\item{\code{patient_id}}{Patient identifier (numeric or character).
+Alias: \code{PATIENT_ID}.}
+\item{\code{event}}{Clinical event code (character).
+Alias: \code{EVENT}.}
 \item{\code{age}}{Patient age at the event in consistent units (numeric,
-non-negative, time-ordered within patient).  The uppercase alias
-\code{DAYS_SINCE_BIRTH} is also accepted.}
+non-negative, time-ordered within patient).
+Alias: \code{DAYS_SINCE_BIRTH}.}
 \item{\code{value}}{(Optional) Continuous measurement recorded at the
-event (e.g. blood pressure or HbA1c).  \code{NA} for discrete events.}
-}
-Uppercase column-name aliases \code{PATIENT_ID} and \code{EVENT} are also
-accepted for compatibility.}
+event (e.g. blood pressure or HbA1c).  \code{NA} for discrete events.
+Alias: \code{VALUE}.}
+}}
 }
 \value{
 Invisibly returns \code{TRUE}.  Prints a confirmation message on

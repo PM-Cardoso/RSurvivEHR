@@ -7,10 +7,11 @@
 survivehr_validate_static(static_covariates)
 }
 \arguments{
-\item{static_covariates}{A \code{data.frame} with a \code{patient_id} column (or
-\code{PATIENT_ID}) plus any number of covariate columns with freely chosen
-names.  Pass the \strong{same columns in the same order} across pretrain,
-fine-tune, and prediction.}
+\item{static_covariates}{A \code{data.frame} with a \code{patient_id} column
+(lowercase preferred; \code{PATIENT_ID} accepted for backward compatibility)
+plus any number of covariate columns with freely chosen names — lowercase
+is recommended for consistency.  Pass the \strong{same columns in the same
+order} across pretrain, fine-tune, and prediction.}
 }
 \value{
 Invisibly returns \code{TRUE}.  Prints a confirmation message on

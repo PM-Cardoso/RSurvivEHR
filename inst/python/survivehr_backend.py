@@ -635,7 +635,8 @@ def _run_train_loop(model: torch.nn.Module,
                     learning_rate: float,
                     epochs: int,
                     device: torch.device,
-                    label: str = "Training") -> List[float]:
+                    label: str = "Training"):
+    """Returns (history: List[float], training_duration_secs: float)."""
     import time
     import math
 
@@ -658,6 +659,7 @@ def _run_train_loop(model: torch.nn.Module,
     print(f"[RSurvivEHR] {label}: {n_epochs} epoch(s), "
           f"{n_batches} batch(es)/epoch, device={device_str}", flush=True)
 
+    wall_start = time.time()
     for epoch in range(n_epochs):
         running   = 0.0
         steps     = 0
@@ -704,7 +706,8 @@ def _run_train_loop(model: torch.nn.Module,
             flush=True,
         )
 
-    return history
+    total_secs = time.time() - wall_start
+    return history, total_secs
 
 
 def train_pretrain_model(events_df: pd.DataFrame,
@@ -730,7 +733,7 @@ def train_pretrain_model(events_df: pd.DataFrame,
     loader = DataLoader(ds, batch_size=int(config.get("batch_size", 16)), shuffle=True)
 
     model = CausalExperiment(cfg=cfg, vocab_size=len(built.event_vocab))
-    history = _run_train_loop(
+    history, training_duration_secs = _run_train_loop(
         model=model,
         loader=loader,
         learning_rate=float(config.get("learning_rate", 3e-4)),
@@ -751,6 +754,7 @@ def train_pretrain_model(events_df: pd.DataFrame,
         "static_raw_cols": built.static_raw_cols,
         "static_col_names": built.static_col_names,
         "history": history,
+        "training_duration_secs": training_duration_secs,
         "device": str(device),
     }
 
@@ -796,6 +800,22 @@ def train_finetune_model(events_df: pd.DataFrame,
     _set_measurement_tokens(cfg, built.values, built.tokens)
 
     outcomes = [str(o) for o in outcomes]
+
+    # Validate outcome count against risk_model before any expensive work.
+    _rm = risk_model.lower()
+    if _rm in ("competing-risk", "cr") and len(outcomes) < 2:
+        raise ValueError(
+            f"risk_model='competing-risk' requires at least 2 outcome codes "
+            f"(got {len(outcomes)}: {outcomes}). "
+            "Use risk_model='single-risk' for a single endpoint."
+        )
+    if _rm in ("single-risk", "sr") and len(outcomes) != 1:
+        raise ValueError(
+            f"risk_model='single-risk' requires exactly 1 outcome code "
+            f"(got {len(outcomes)}: {outcomes}). "
+            "Use risk_model='competing-risk' for multiple endpoints."
+        )
+
     reserved = {
         built.token_policy["pad_token"],
         built.token_policy["unk_token"],
@@ -867,7 +887,7 @@ def train_finetune_model(events_df: pd.DataFrame,
 
 
 
-    history = _run_train_loop(
+    history, training_duration_secs = _run_train_loop(
         model=model,
         loader=loader,
         learning_rate=float(config.get("learning_rate", 3e-4)),
@@ -891,6 +911,7 @@ def train_finetune_model(events_df: pd.DataFrame,
         "static_raw_cols": built.static_raw_cols,
         "static_col_names": built.static_col_names,
         "history": history,
+        "training_duration_secs": training_duration_secs,
         "device": str(device),
     }
 
@@ -1159,6 +1180,7 @@ def save_model_bundle(model_bundle: Dict[str, Any], path: str) -> None:
         "token_policy": model_bundle.get("token_policy", _token_policy_from_config()),
         "static_raw_cols": model_bundle.get("static_raw_cols", None),
         "static_col_names": model_bundle.get("static_col_names", None),
+        "training_duration_secs": model_bundle.get("training_duration_secs", None),
         "device": model_bundle.get("device", "cpu"),
     }
     torch.save(payload, path)
@@ -1201,5 +1223,6 @@ def load_model_bundle(path: str) -> Dict[str, Any]:
         "token_policy": payload.get("token_policy", _token_policy_from_config()),
         "static_raw_cols": payload.get("static_raw_cols", None),
         "static_col_names": payload.get("static_col_names", None),
+        "training_duration_secs": payload.get("training_duration_secs", None),
         "device": payload.get("device", "cpu"),
     }

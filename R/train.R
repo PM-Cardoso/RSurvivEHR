@@ -38,6 +38,10 @@
 #'     \item{`token_policy`}{Token policy flags (`include_unk`,
 #'       `include_cls_sep`).}
 #'     \item{`history`}{List of per-epoch training losses.}
+#'     \item{`training_duration_secs`}{Wall-clock seconds elapsed during
+#'       training (a single `numeric` scalar).  Use this to report and
+#'       compare training times, e.g.
+#'       `cat("Pretrain took", round(pt$training_duration_secs, 1), "s\\n")`.}
 #'     \item{`device`}{String identifying the compute device used
 #'       (e.g. `"cpu"` or `"cuda:0"`).}
 #'   }
@@ -128,12 +132,20 @@ survivehr_pretrain <- function(events,
 #' backbone and fine-tunes the combined model on a labelled cohort.  Two
 #' head types are supported:
 #' \itemize{
-#'   \item **`"competing-risk"`** — models two or more outcomes that compete
-#'     (the first to occur prevents the others from being observed).  Supply
-#'     all outcome codes in `outcomes`.
-#'   \item **`"single-risk"`** — models a single endpoint; patients without
-#'     the outcome are treated as right-censored.
+#'   \item **`"competing-risk"`** — models **two or more** outcomes that
+#'     compete (the first to occur prevents the others from being observed).
+#'     Requires `length(outcomes) >= 2`; an error is raised otherwise.
+#'     Patients whose `target_event` is not one of the `outcomes` codes are
+#'     right-censored.
+#'   \item **`"single-risk"`** — models **exactly one** endpoint.
+#'     Requires `length(outcomes) == 1`; an error is raised otherwise.
+#'     Patients whose `target_event` does not match that code are
+#'     right-censored.
 #' }
+#'
+#' In both cases, right-censored patients contribute `log(1 - CDF(target_age))`
+#' to the DeSurv loss; patients with an observed outcome contribute the
+#' event-density term for their respective risk.
 #'
 #' To avoid data leakage, the `events` frame passed here must:
 #' 1. Have all outcome event codes **removed** (they are supplied only via
@@ -146,8 +158,13 @@ survivehr_pretrain <- function(events,
 #'   post-outcome rows removed) with columns `patient_id`, `event`, `age`,
 #'   and optionally `value`.
 #' @param targets A `data.frame` with columns `patient_id`, `target_event`,
-#'   and `target_age` labelling the observed outcome (cases) or last
-#'   non-outcome event (censored patients).  Build with
+#'   and `target_age` labelling the observed outcome (cases) or the last
+#'   recorded non-outcome event (censored patients).  The censoring
+#'   convention is: if a patient's `target_event` code is **not** one of
+#'   the strings in `outcomes`, they are treated as right-censored and
+#'   contribute `log(1 - CDF(target_age))` to the loss; if it **is** in
+#'   `outcomes`, they are treated as having experienced that event and
+#'   contribute the event-density term.  Build with
 #'   `survivehr_validate_targets()`.
 #' @param outcomes Character vector of outcome event codes that the
 #'   fine-tuned head predicts.  Must match the codes used in `targets`.
@@ -168,8 +185,9 @@ survivehr_pretrain <- function(events,
 #' @param event_vocab An optional named integer vector overriding the
 #'   vocabulary.  Rarely needed; prefer supplying `pretrained_model`.
 #' @return A named list (fine-tuned model bundle) with the same structure
-#'   as the pre-trained bundle plus fine-tune-specific fields.  Pass to
-#'   `survivehr_predict()` or `survivehr_save_model()`.
+#'   as the pre-trained bundle plus fine-tune-specific fields, including
+#'   `training_duration_secs` (wall-clock seconds for this fine-tune run).
+#'   Pass to `survivehr_predict()` or `survivehr_save_model()`.
 #' @export
 #' @examples
 #' \dontrun{
@@ -242,6 +260,23 @@ survivehr_finetune <- function(events,
                                pretrained_model = NULL,
                                event_vocab = NULL) {
   risk_model <- match.arg(risk_model)
+  outcomes   <- as.character(outcomes)
+  if (risk_model == "competing-risk" && length(outcomes) < 2L) {
+    stop(
+      "'competing-risk' requires at least 2 outcome codes (got ",
+      length(outcomes), ": ", paste(outcomes, collapse = ", "), "). ",
+      "Use risk_model = \"single-risk\" for a single endpoint.",
+      call. = FALSE
+    )
+  }
+  if (risk_model == "single-risk" && length(outcomes) != 1L) {
+    stop(
+      "'single-risk' requires exactly 1 outcome code (got ",
+      length(outcomes), ": ", paste(outcomes, collapse = ", "), "). ",
+      "Use risk_model = \"competing-risk\" for multiple endpoints.",
+      call. = FALSE
+    )
+  }
   survivehr_validate_events(events)
   survivehr_validate_targets(targets)
   if (!is.null(static_covariates)) {
@@ -252,7 +287,7 @@ survivehr_finetune <- function(events,
   backend$train_finetune_model(
     events_df = events,
     targets_df = targets,
-    outcomes = as.list(as.character(outcomes)),
+    outcomes = as.list(outcomes),
     risk_model = risk_model,
     static_df = static_covariates,
     config = .to_py_dict(config),

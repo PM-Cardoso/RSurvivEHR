@@ -244,9 +244,12 @@ class FineTuneExperiment(nn.Module):
             return outputs, losses, context
 
         # ---- training path -------------------------------------------
-        # target_token: vocab indices  →  remap to 1-based head risk indices
+        # target_token: vocab indices  →  remap to 1-based head risk indices.
+        # Unmapped tokens (i.e. events that are NOT a tracked outcome) represent
+        # censored patients and must map to k=0 so DeSurv uses the censoring
+        # likelihood term (log(1 - CDF)) rather than the event term.
         raw_tok  = batch["target_token"].view(-1, 1)    # (bsz, 1) vocab indices
-        head_tok = torch.ones_like(raw_tok)             # default to risk-1 for unmapped tokens
+        head_tok = torch.zeros_like(raw_tok)            # default = 0 (censored)
         for vocab_idx, head_idx in self._tok_to_head.items():
             head_tok = torch.where(raw_tok == vocab_idx,
                                    torch.full_like(head_tok, head_idx),

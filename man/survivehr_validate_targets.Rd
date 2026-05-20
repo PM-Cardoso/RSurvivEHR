@@ -7,18 +7,21 @@
 survivehr_validate_targets(targets)
 }
 \arguments{
-\item{targets}{A \code{data.frame} with columns:
+\item{targets}{A \code{data.frame} with columns (lowercase is the preferred
+canonical form; uppercase aliases are accepted for backward compatibility):
 \describe{
-\item{\code{patient_id}}{Patient identifier matching the events frame.}
+\item{\code{patient_id}}{Patient identifier matching the events frame.
+Alias: \code{PATIENT_ID}.}
 \item{\code{target_event}}{Event code for the labelled outcome (cases) or
-the last observed non-outcome event (censored).}
+the last observed non-outcome event (censored).
+Aliases: \code{TARGET_EVENT}, \code{EVENT}.}
 \item{\code{target_age}}{Age at the target event.  Must be numeric and
-non-negative.}
+non-negative.
+Aliases: \code{TARGET_AGE}, \code{DAYS_SINCE_BIRTH}.}
 \item{\code{target_value}}{(Optional) Continuous measurement at the
-target event.  \code{NA} for discrete events.}
-}
-Uppercase column-name aliases \code{PATIENT_ID}, \code{EVENT}, and
-\code{DAYS_SINCE_BIRTH} are also accepted for compatibility.}
+target event.  \code{NA} for discrete events.
+Aliases: \code{TARGET_VALUE}, \code{VALUE}.}
+}}
 }
 \value{
 Invisibly returns \code{TRUE}.  Prints a confirmation message listing

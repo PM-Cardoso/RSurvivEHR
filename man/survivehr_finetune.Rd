@@ -21,8 +21,13 @@ post-outcome rows removed) with columns \code{patient_id}, \code{event}, \code{a
 and optionally \code{value}.}
 
 \item{targets}{A \code{data.frame} with columns \code{patient_id}, \code{target_event},
-and \code{target_age} labelling the observed outcome (cases) or last
-non-outcome event (censored patients).  Build with
+and \code{target_age} labelling the observed outcome (cases) or the last
+recorded non-outcome event (censored patients).  The censoring
+convention is: if a patient's \code{target_event} code is \strong{not} one of
+the strings in \code{outcomes}, they are treated as right-censored and
+contribute \code{log(1 - CDF(target_age))} to the loss; if it \strong{is} in
+\code{outcomes}, they are treated as having experienced that event and
+contribute the event-density term.  Build with
 \code{survivehr_validate_targets()}.}
 
 \item{outcomes}{Character vector of outcome event codes that the
@@ -36,8 +41,11 @@ the \code{surv_layer} used during pre-training.}
 columns} as those used at pre-training time.  Pass \code{NULL} to omit.}
 
 \item{config}{A named list from \code{survivehr_config()}.  \code{time_scale} is
-inherited from the pre-trained bundle when \code{pretrained_model} is
-supplied — no need to set it here.}
+inherited automatically from the pretrained bundle — no need to set it
+here.  Use \code{outcome_horizon} to set the ODE prediction window length
+(in the same units as \code{age}) independently of \code{time_scale}.  For
+example, \code{outcome_horizon = 5} gives a 5-year risk window regardless
+of the backbone normalisation scale.}
 
 \item{pretrained_model}{Model bundle returned by \code{survivehr_pretrain()}
 or \code{survivehr_load_model()}.  When supplied, the vocabulary, weights,
@@ -48,22 +56,31 @@ vocabulary.  Rarely needed; prefer supplying \code{pretrained_model}.}
 }
 \value{
 A named list (fine-tuned model bundle) with the same structure
-as the pre-trained bundle plus fine-tune-specific fields.  Pass to
-\code{survivehr_predict()} or \code{survivehr_save_model()}.
+as the pre-trained bundle plus fine-tune-specific fields, including
+\code{training_duration_secs} (wall-clock seconds for this fine-tune run).
+Pass to \code{survivehr_predict()} or \code{survivehr_save_model()}.
 }
 \description{
 Attaches a fresh outcome-level survival head on top of the pre-trained
 backbone and fine-tunes the combined model on a labelled cohort.  Two
 head types are supported:
 \itemize{
-\item \strong{\code{"competing-risk"}} — models two or more outcomes that compete
-(the first to occur prevents the others from being observed).  Supply
-all outcome codes in \code{outcomes}.
-\item \strong{\code{"single-risk"}} — models a single endpoint; patients without
-the outcome are treated as right-censored.
+\item \strong{\code{"competing-risk"}} — models \strong{two or more} outcomes that
+compete (the first to occur prevents the others from being observed).
+Requires \code{length(outcomes) >= 2}; an error is raised otherwise.
+Patients whose \code{target_event} is not one of the \code{outcomes} codes are
+right-censored.
+\item \strong{\code{"single-risk"}} — models \strong{exactly one} endpoint.
+Requires \code{length(outcomes) == 1}; an error is raised otherwise.
+Patients whose \code{target_event} does not match that code are
+right-censored.
 }
 }
 \details{
+In both cases, right-censored patients contribute \code{log(1 - CDF(target_age))}
+to the DeSurv loss; patients with an observed outcome contribute the
+event-density term for their respective risk.
+
 To avoid data leakage, the \code{events} frame passed here must:
 \enumerate{
 \item Have all outcome event codes \strong{removed} (they are supplied only via
@@ -97,8 +114,8 @@ ft_events_cr <- ft_events_cr[ft_events_cr$age < ft_events_cr$target_age,
 
 cfg_cr <- survivehr_config(
   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
-  epochs = 10, batch_size = 4, surv_layer = "competing-risk"
-  # time_scale inherited automatically from the pretrained bundle
+  epochs = 10, batch_size = 4, surv_layer = "competing-risk",
+  outcome_horizon = 5.0  # 5-year prediction window; time_scale inherited from pt
 )
 ft_cr <- survivehr_finetune(
   events = ft_events_cr, targets = targets_cr,
