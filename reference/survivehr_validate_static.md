@@ -15,10 +15,11 @@ survivehr_validate_static(static_covariates)
 
 - static_covariates:
 
-  A `data.frame` with a `patient_id` column (or `PATIENT_ID`) plus any
-  number of covariate columns with freely chosen names. Pass the **same
-  columns in the same order** across pretrain, fine-tune, and
-  prediction.
+  A `data.frame` with a `patient_id` column (lowercase preferred;
+  `PATIENT_ID` accepted for backward compatibility) plus any number of
+  covariate columns with freely chosen names — lowercase is recommended
+  for consistency. Pass the **same columns in the same order** across
+  pretrain, fine-tune, and prediction.
 
 ## Value
 

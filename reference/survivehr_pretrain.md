@@ -26,7 +26,9 @@ survivehr_pretrain(
 - events:
 
   A `data.frame` with columns `patient_id`, `event`, `age` (and
-  optionally `value`). Validated with
+  optionally `value`) — lowercase is the preferred canonical form;
+  uppercase aliases `PATIENT_ID`, `EVENT`, `DAYS_SINCE_BIRTH` are
+  accepted for backward compatibility. Validated with
   [`survivehr_validate_events()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_events.md)
   before being passed to Python.
 
@@ -73,8 +75,9 @@ A named list (model bundle) with elements:
 
 - `time_scale`:
 
-  The prediction window / age normalisation divisor stored in the
-  bundle.
+  The backbone age normalisation divisor stored in the bundle. Used to
+  normalise context ages before they enter the transformer; inherited
+  automatically at fine-tune time.
 
 - `token_policy`:
 
@@ -83,6 +86,12 @@ A named list (model bundle) with elements:
 - `history`:
 
   List of per-epoch training losses.
+
+- `training_duration_secs`:
+
+  Wall-clock seconds elapsed during training (a single `numeric`
+  scalar). Use this to report and compare training times, e.g.
+  `cat("Pretrain took", round(pt$training_duration_secs, 1), "s\\n")`.
 
 - `device`:
 
@@ -143,16 +152,16 @@ events_pop <- data.frame(
 )
 static_pop <- data.frame(
   patient_id    = 1:10,
-  SEX           = c("M","F","M","F","M","F","M","F","M","F"),
-  ETHNICITY     = c("White","Asian","White","Black","White",
+  sex           = c("M","F","M","F","M","F","M","F","M","F"),
+  ethnicity     = c("White","Asian","White","Black","White",
                     "Asian","White","White","Black","White"),
-  IMD           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
-  YEAR_OF_BIRTH = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
+  imd           = c(3L, 1L, 5L, 2L, 4L, 3L, 1L, 5L, 2L, 4L),
+  year_of_birth = c(1960L,1970L,1952L,1975L,1963L,1958L,1978L,1960L,1968L,1975L)
 )
-# 5-year prediction window; ages are in years
+# Year-by-year backbone normalisation (ages in years → model sees plain year values)
 cfg <- survivehr_config(
   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
-  epochs = 10, batch_size = 4, time_scale = 5.0
+  epochs = 10, batch_size = 4, time_scale = 1.0
 )
 pt <- survivehr_pretrain(events_pop, static_pop, cfg)
 # Vocabulary is frequency-ordered: most-common events get the smallest IDs

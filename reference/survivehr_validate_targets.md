@@ -16,28 +16,27 @@ survivehr_validate_targets(targets)
 
 - targets:
 
-  A `data.frame` with columns:
+  A `data.frame` with columns (lowercase is the preferred canonical
+  form; uppercase aliases are accepted for backward compatibility):
 
   `patient_id`
 
-  :   Patient identifier matching the events frame.
+  :   Patient identifier matching the events frame. Alias: `PATIENT_ID`.
 
   `target_event`
 
   :   Event code for the labelled outcome (cases) or the last observed
-      non-outcome event (censored).
+      non-outcome event (censored). Aliases: `TARGET_EVENT`, `EVENT`.
 
   `target_age`
 
   :   Age at the target event. Must be numeric and non-negative.
+      Aliases: `TARGET_AGE`, `DAYS_SINCE_BIRTH`.
 
   `target_value`
 
   :   (Optional) Continuous measurement at the target event. `NA` for
-      discrete events.
-
-  Uppercase column-name aliases `PATIENT_ID`, `EVENT`, and
-  `DAYS_SINCE_BIRTH` are also accepted for compatibility.
+      discrete events. Aliases: `TARGET_VALUE`, `VALUE`.
 
 ## Value
 

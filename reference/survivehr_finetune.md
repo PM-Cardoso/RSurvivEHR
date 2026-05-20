@@ -4,12 +4,14 @@ Attaches a fresh outcome-level survival head on top of the pre-trained
 backbone and fine-tunes the combined model on a labelled cohort. Two
 head types are supported:
 
-- **`"competing-risk"`** — models two or more outcomes that compete (the
-  first to occur prevents the others from being observed). Supply all
-  outcome codes in `outcomes`.
+- **`"competing-risk"`** — models **two or more** outcomes that compete
+  (the first to occur prevents the others from being observed). Requires
+  `length(outcomes) >= 2`; an error is raised otherwise. Patients whose
+  `target_event` is not one of the `outcomes` codes are right-censored.
 
-- **`"single-risk"`** — models a single endpoint; patients without the
-  outcome are treated as right-censored.
+- **`"single-risk"`** — models **exactly one** endpoint. Requires
+  `length(outcomes) == 1`; an error is raised otherwise. Patients whose
+  `target_event` does not match that code are right-censored.
 
 ## Usage
 
@@ -37,8 +39,13 @@ survivehr_finetune(
 - targets:
 
   A `data.frame` with columns `patient_id`, `target_event`, and
-  `target_age` labelling the observed outcome (cases) or last
-  non-outcome event (censored patients). Build with
+  `target_age` labelling the observed outcome (cases) or the last
+  recorded non-outcome event (censored patients). The censoring
+  convention is: if a patient's `target_event` code is **not** one of
+  the strings in `outcomes`, they are treated as right-censored and
+  contribute `log(1 - CDF(target_age))` to the loss; if it **is** in
+  `outcomes`, they are treated as having experienced that event and
+  contribute the event-density term. Build with
   [`survivehr_validate_targets()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_targets.md).
 
 - outcomes:
@@ -61,8 +68,11 @@ survivehr_finetune(
 
   A named list from
   [`survivehr_config()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_config.md).
-  `time_scale` is inherited from the pre-trained bundle when
-  `pretrained_model` is supplied — no need to set it here.
+  `time_scale` is inherited automatically from the pretrained bundle —
+  no need to set it here. Use `outcome_horizon` to set the ODE
+  prediction window length (in the same units as `age`) independently of
+  `time_scale`. For example, `outcome_horizon = 5` gives a 5-year risk
+  window regardless of the backbone normalisation scale.
 
 - pretrained_model:
 
@@ -81,12 +91,18 @@ survivehr_finetune(
 ## Value
 
 A named list (fine-tuned model bundle) with the same structure as the
-pre-trained bundle plus fine-tune-specific fields. Pass to
+pre-trained bundle plus fine-tune-specific fields, including
+`training_duration_secs` (wall-clock seconds for this fine-tune run).
+Pass to
 [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
 or
 [`survivehr_save_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.md).
 
 ## Details
+
+In both cases, right-censored patients contribute
+`log(1 - CDF(target_age))` to the DeSurv loss; patients with an observed
+outcome contribute the event-density term for their respective risk.
 
 To avoid data leakage, the `events` frame passed here must:
 
@@ -123,8 +139,8 @@ ft_events_cr <- ft_events_cr[ft_events_cr$age < ft_events_cr$target_age,
 
 cfg_cr <- survivehr_config(
   block_size = 64, n_layer = 2, n_head = 2, n_embd = 64,
-  epochs = 10, batch_size = 4, surv_layer = "competing-risk"
-  # time_scale inherited automatically from the pretrained bundle
+  epochs = 10, batch_size = 4, surv_layer = "competing-risk",
+  outcome_horizon = 5.0  # 5-year prediction window; time_scale inherited from pt
 )
 ft_cr <- survivehr_finetune(
   events = ft_events_cr, targets = targets_cr,

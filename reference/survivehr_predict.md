@@ -45,12 +45,13 @@ survivehr_predict(
 
   An optional numeric vector of time points (in the same units as `age`)
   at which to read the cumulative-incidence CDF for fine-tuned models.
-  Each value must be in `(0, time_scale]` — the model's trained
-  prediction window. For example, with `time_scale = 5.0` (years) use
-  `eval_times = c(1, 2, 3, 5)` to obtain 1-, 2-, 3- and 5-year risks.
-  When `NULL` (default) only `_cdf_last` (risk at the full horizon) and
-  `_auc` (average risk) are returned, preserving backward compatibility.
-  Ignored for pretrain models.
+  Each value must be in `(0, outcome_horizon]` — the ODE prediction
+  window stored in the fine-tuned bundle. For example, with
+  `outcome_horizon = 5.0` (years) use `eval_times = c(1, 2, 3, 5)` to
+  obtain 1-, 2-, 3- and 5-year risks. When `NULL` (default) only
+  `_cdf_last` (risk at the full horizon) and `_auc` (average risk) are
+  returned, preserving backward compatibility. Ignored for pretrain
+  models.
 
 ## Value
 
@@ -63,7 +64,7 @@ For a **fine-tuned** model, a `data.frame` with columns:
 - `{outcome}_cdf_last`:
 
   Cumulative incidence at the **end** of the prediction window
-  (`t = time_scale`).
+  (`t = outcome_horizon`).
 
 - `{outcome}_auc`:
 
@@ -123,9 +124,9 @@ preds <- survivehr_predict(ft, pred_events, static_pop)
 print(preds)
 # Columns: patient_id, CVD_cdf_last, CVD_auc
 #
-# CVD_cdf_last : probability of CVD within the next 5 years (time_scale = 5.0,
-#                stored in the model bundle — no need to set it at predict time)
-# CVD_auc      : average cumulative CVD risk over that 5-year window;
+# CVD_cdf_last : probability of CVD within outcome_horizon (5 years when
+#                outcome_horizon = 5.0); stored in the bundle automatically
+# CVD_auc      : average cumulative CVD risk over that window;
 #                higher = greater overall risk
 } # }
 ```

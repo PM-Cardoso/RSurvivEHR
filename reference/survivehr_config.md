@@ -142,6 +142,6 @@ cfg$outcome_horizon  # 5
 
 # Both default to 1.0 if outcome_horizon is omitted (backward compatible)
 cfg2 <- survivehr_config(time_scale = 1.0)
-cfg2$outcome_horizon  # NULL -> inherits time_scale in the backend
+cfg2$outcome_horizon  # NULL → inherits time_scale in the backend
 #> NULL
 ```

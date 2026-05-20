@@ -20,29 +20,28 @@ survivehr_validate_events(events)
 
 - events:
 
-  A `data.frame` with columns:
+  A `data.frame` with columns (lowercase is the preferred canonical
+  form; uppercase aliases are accepted for backward compatibility):
 
   `patient_id`
 
-  :   Patient identifier (numeric or character).
+  :   Patient identifier (numeric or character). Alias: `PATIENT_ID`.
 
   `event`
 
-  :   Clinical event code (character).
+  :   Clinical event code (character). Alias: `EVENT`.
 
   `age`
 
   :   Patient age at the event in consistent units (numeric,
-      non-negative, time-ordered within patient). The uppercase alias
-      `DAYS_SINCE_BIRTH` is also accepted.
+      non-negative, time-ordered within patient). Alias:
+      `DAYS_SINCE_BIRTH`.
 
   `value`
 
   :   (Optional) Continuous measurement recorded at the event (e.g.
-      blood pressure or HbA1c). `NA` for discrete events.
-
-  Uppercase column-name aliases `PATIENT_ID` and `EVENT` are also
-  accepted for compatibility.
+      blood pressure or HbA1c). `NA` for discrete events. Alias:
+      `VALUE`.
 
 ## Value
 

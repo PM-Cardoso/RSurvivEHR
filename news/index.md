@@ -1,5 +1,84 @@
 # Changelog
 
+## RSurvivEHR 0.9.1
+
+#### New feature: `training_duration_secs` — wall-clock training time in model bundles
+
+Both
+[`survivehr_pretrain()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_pretrain.md)
+and
+[`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md)
+now record how long training took and return it as a named element of
+the model bundle:
+
+``` r
+
+pt <- survivehr_pretrain(events, static, cfg)
+cat("Pretrain took", round(pt$training_duration_secs, 1), "seconds\n")
+
+ft <- survivehr_finetune(events, targets, outcomes = "CVD",
+                         config = cfg_cr, pretrained_model = pt)
+cat("Fine-tune took", round(ft$training_duration_secs / 60, 2), "minutes\n")
+```
+
+The value is a plain `numeric` scalar (seconds, wall-clock). It is
+persisted inside `.pt` bundle files by
+[`survivehr_save_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.md)
+and restored by
+[`survivehr_load_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_load_model.md),
+so training times are available even after reloading a saved model.
+
+**Changed files:** `inst/python/survivehr_backend.py`, `R/train.R`
+
+#### Validation: `risk_model` / `outcomes` mismatch now raises an informative error
+
+[`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md)
+now validates the combination of `risk_model` and `outcomes` before any
+Python call is made:
+
+- `risk_model = "competing-risk"` requires **265 2** outcome codes —
+  raises an error if only one is supplied (use `"single-risk"` instead).
+- `risk_model = "single-risk"` requires **exactly 1** outcome code —
+  raises an error if multiple are supplied (use `"competing-risk"`
+  instead).
+
+The same check is enforced inside the Python backend as a second line of
+defence.
+
+**Changed files:** `inst/python/survivehr_backend.py`, `R/train.R`
+
+#### Bug fix: censored patients were silently treated as observed events during fine-tuning
+
+In `FineTuneExperiment.forward()` the token-to-risk-index mapping
+defaulted to `k = 1` (observed event) for any token not in the tracked
+`outcomes` list. This meant censored patients — whose `target_event` is
+their **last recorded non-outcome event** — were incorrectly treated as
+having experienced the outcome, so the censoring likelihood term
+`log(1 − CDF(t))` in the DeSurv loss was never used.
+
+The default is now `k = 0` (censored). Only patients whose
+`target_event` exactly matches one of the strings supplied to `outcomes`
+contribute the event-likelihood term; all others correctly contribute
+the censoring term. This affects both `"competing-risk"` and
+`"single-risk"` fine-tune heads.
+
+**How to supply censored patients:** pass their last observed
+(non-outcome) event code and age as `target_event` / `target_age` in the
+`targets` frame:
+
+``` r
+
+targets <- data.frame(
+  patient_id   = c(1L,    2L,         3L),
+  target_event = c("CVD", "BP_CHECK", "STATIN"),   # patient 2 & 3 are censored
+  target_age   = c(58.0,  61.2,       65.0)
+)
+```
+
+**Changed files:** `inst/python/SurvivEHR/experiments.py`
+
+------------------------------------------------------------------------
+
 ## RSurvivEHR 0.9.0
 
 #### New feature: `outcome_horizon` — independent ODE prediction window
