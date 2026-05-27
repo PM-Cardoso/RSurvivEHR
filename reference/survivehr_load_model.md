@@ -25,8 +25,8 @@ survivehr_load_model(path)
 ## Value
 
 A named list (model bundle) with elements `model`, `event_vocab`,
-`inv_vocab`, `config`, `time_scale`, `token_policy`, `history`, and
-`device`.
+`inv_vocab`, `config`, `time_scale`, `value_standardization`,
+`token_policy`, `history`, and `device`.
 
 ## Examples
 

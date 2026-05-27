@@ -347,10 +347,12 @@ projects the last hidden state through a per-token
 standard deviation `σ` are returned as `predicted_value_mean` and
 `predicted_value_sd`.
 
-> **No internal standardisation**: values are stored and predicted in
-> the same units supplied in the `value` column. Pre-normalise
-> measurements before training if different event types carry values on
-> different scales (e.g. blood pressure in mmHg vs HbA1c in mmol/mol).
+> **Automatic internal standardisation**: non-missing `value` entries
+> are standardised per event type (event-specific z-score) using
+> statistics fitted at pre-training time and stored in the model bundle.
+> The same mapping is reused at fine-tune/predict time, and value
+> predictions are back-transformed to original units before returning to
+> R.
 
 ------------------------------------------------------------------------
 
@@ -373,7 +375,7 @@ standard deviation `σ` are returned as `predicted_value_mean` and
            ▼  survivehr_backend.py  _build_context_data()
       tokens [n, block_size]  int64     ← padded token sequences
       ages   [n, block_size]  float32   ← age / time_scale, padded with 0
-      values [n, block_size]  float32   ← lab values, padded with NaN
+      values [n, block_size]  float32   ← per-event z-scored values, padded with NaN
       mask   [n, block_size]  bool      ← True = real event
            │
            ▼  survivehr_backend.py  _encode_static()
@@ -381,7 +383,7 @@ standard deviation `σ` are returned as `predicted_value_mean` and
            │
            ▼  survivehr_backend.py  FineTuneDataset  (fine-tune only)
       target_token      [n]   int64     ← vocab ID of the outcome event
-      target_age_delta  [n]   float32   ← (target_age − last_age) / time_scale
+      target_age_delta  [n]   float32   ← (target_age − last_age) / outcome_horizon
            │
            ▼  torch DataLoader
       batched tensors → transformer backbone → survival ODE head → loss / CDF

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,6 +38,24 @@
       <small>Source: <a href="https://github.com/PM-Cardoso/RSurvivEHR/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.9.2" id="rsurvivehr-092">RSurvivEHR 0.9.2<a class="anchor" aria-label="anchor" href="#rsurvivehr-092"></a></h2>
+<div class="section level4">
+<h4 id="new-feature-automatic-per-event-value-standardisation-across-the-full-pipeline-0-9-2">New feature: automatic per-event value standardisation across the full pipeline<a class="anchor" aria-label="anchor" href="#new-feature-automatic-per-event-value-standardisation-across-the-full-pipeline-0-9-2"></a></h4>
+<p>Numeric event measurements in <code>value</code> are now standardised automatically <strong>per event type</strong> (event-specific z-score) during pre-training, using all non-<code>NA</code> rows for each event.</p>
+<p>The fitted mapping is stored in every model bundle as <code>value_standardization</code> and is reused automatically in all downstream stages:</p>
+<ul><li>
+<code><a href="../reference/survivehr_finetune.html">survivehr_finetune()</a></code> standardises context <code>value</code> and <code>target_value</code> with the pre-training event-specific statistics.</li>
+<li>
+<code><a href="../reference/survivehr_predict.html">survivehr_predict()</a></code> standardises input <code>value</code> consistently and returns pretrain <code>generated_value</code> back in original units.</li>
+<li>
+<code><a href="../reference/survivehr_predict_value.html">survivehr_predict_value()</a></code> returns <code>predicted_value_mean</code> / <code>predicted_value_sd</code> back in original units.</li>
+<li>
+<code><a href="../reference/survivehr_save_model.html">survivehr_save_model()</a></code> / <code><a href="../reference/survivehr_load_model.html">survivehr_load_model()</a></code> persist and restore <code>value_standardization</code> so behaviour is stable after reload.</li>
+</ul><p>Events with no observed numeric values at pre-training time continue to return <code>NaN</code> for value-head predictions.</p>
+<p><strong>Changed files:</strong> <code>inst/python/survivehr_backend.py</code>, <code>R/train.R</code>, <code>man/*.Rd</code>, <code>vignettes/*.Rmd</code></p>
+</div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.9.1" id="rsurvivehr-091">RSurvivEHR 0.9.1<a class="anchor" aria-label="anchor" href="#rsurvivehr-091"></a></h2>
 <div class="section level4">

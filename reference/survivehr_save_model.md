@@ -5,8 +5,8 @@ Serialises a model bundle (returned by
 or
 [`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md))
 to a `.pt` file. The bundle includes the model weights, vocabulary,
-static column schema, `time_scale`, token policy, and training history.
-Reload with
+static column schema, `time_scale`, `value_standardization`, token
+policy, and training history. Reload with
 [`survivehr_load_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_load_model.md).
 
 ## Usage

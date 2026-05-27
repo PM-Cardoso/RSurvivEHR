@@ -79,6 +79,15 @@ A named list (model bundle) with elements:
   normalise context ages before they enter the transformer; inherited
   automatically at fine-tune time.
 
+- `value_standardization`:
+
+  Per-event value scaling metadata learned during pre-training from
+  non-`NA` `value` rows. For each event with observed numeric values,
+  the bundle stores event-specific mean/sd used for internal z-score
+  standardisation. The same mapping is reused in fine-tuning and
+  prediction, and value predictions are de-standardised back to original
+  units before being returned to R.
+
 - `token_policy`:
 
   Token policy flags (`include_unk`, `include_cls_sep`).

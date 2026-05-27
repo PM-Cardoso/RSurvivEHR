@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -362,13 +362,12 @@ pre-training time will return non-NaN predictions. In this vignette,
 others return <code>NaN</code>.</p>
 </blockquote>
 <blockquote>
-<p><strong>Value scale</strong>: the model stores and predicts values in
-exactly the units you supply — no internal standardisation is applied.
-When different event types carry measurements on very different scales
-(e.g. BP ~140 mmHg vs HbA1c ~70 mmol/mol), pre-normalise the
-<code>value</code> column before training and back-transform predictions
-afterwards. See the <em>Advanced topics</em> vignette for a worked
-example.</p>
+<p><strong>Value scale (automatic)</strong>: numeric <code>value</code>
+inputs are now standardised internally <strong>per event type</strong>
+(event-specific z-score from pre-training). The same event-specific
+mapping is reused in fine-tuning and prediction, and returned
+predictions are automatically back-transformed to the original
+units.</p>
 </blockquote>
 <hr>
 </div>

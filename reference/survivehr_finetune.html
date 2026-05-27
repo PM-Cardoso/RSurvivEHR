@@ -33,7 +33,7 @@ right-censored.
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -155,7 +155,8 @@ vocabulary.  Rarely needed; prefer supplying <code>pretrained_model</code>.</p><
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A named list (fine-tuned model bundle) with the same structure
 as the pre-trained bundle plus fine-tune-specific fields, including
-<code>training_duration_secs</code> (wall-clock seconds for this fine-tune run).
+<code>training_duration_secs</code> (wall-clock seconds for this fine-tune run) and
+inherited <code>value_standardization</code> metadata from the pretrained bundle.
 Pass to <code><a href="survivehr_predict.html">survivehr_predict()</a></code> or <code><a href="survivehr_save_model.html">survivehr_save_model()</a></code>.</p>
     </div>
     <div class="section level2">

@@ -1,5 +1,38 @@
 # Changelog
 
+## RSurvivEHR 0.9.2
+
+#### New feature: automatic per-event value standardisation across the full pipeline
+
+Numeric event measurements in `value` are now standardised automatically
+**per event type** (event-specific z-score) during pre-training, using
+all non-`NA` rows for each event.
+
+The fitted mapping is stored in every model bundle as
+`value_standardization` and is reused automatically in all downstream
+stages:
+
+- [`survivehr_finetune()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.md)
+  standardises context `value` and `target_value` with the pre-training
+  event-specific statistics.
+- [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
+  standardises input `value` consistently and returns pretrain
+  `generated_value` back in original units.
+- [`survivehr_predict_value()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict_value.md)
+  returns `predicted_value_mean` / `predicted_value_sd` back in original
+  units.
+- [`survivehr_save_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.md)
+  /
+  [`survivehr_load_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_load_model.md)
+  persist and restore `value_standardization` so behaviour is stable
+  after reload.
+
+Events with no observed numeric values at pre-training time continue to
+return `NaN` for value-head predictions.
+
+**Changed files:** `inst/python/survivehr_backend.py`, `R/train.R`,
+`man/*.Rd`, `vignettes/*.Rmd`
+
 ## RSurvivEHR 0.9.1
 
 #### New feature: `training_duration_secs` — wall-clock training time in model bundles

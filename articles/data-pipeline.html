@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -565,11 +565,12 @@ deviation <code>σ</code> are returned as
 <code>predicted_value_mean</code> and
 <code>predicted_value_sd</code>.</p>
 <blockquote>
-<p><strong>No internal standardisation</strong>: values are stored and
-predicted in the same units supplied in the <code>value</code> column.
-Pre-normalise measurements before training if different event types
-carry values on different scales (e.g. blood pressure in mmHg vs HbA1c
-in mmol/mol).</p>
+<p><strong>Automatic internal standardisation</strong>: non-missing
+<code>value</code> entries are standardised per event type
+(event-specific z-score) using statistics fitted at pre-training time
+and stored in the model bundle. The same mapping is reused at
+fine-tune/predict time, and value predictions are back-transformed to
+original units before returning to R.</p>
 </blockquote>
 <hr>
 </div>
@@ -594,7 +595,7 @@ in mmol/mol).</p>
        ▼  survivehr_backend.py  _build_context_data()
   tokens [n, block_size]  int64     ← padded token sequences
   ages   [n, block_size]  float32   ← age / time_scale, padded with 0
-  values [n, block_size]  float32   ← lab values, padded with NaN
+  values [n, block_size]  float32   ← per-event z-scored values, padded with NaN
   mask   [n, block_size]  bool      ← True = real event
        │
        ▼  survivehr_backend.py  _encode_static()
@@ -602,7 +603,7 @@ in mmol/mol).</p>
        │
        ▼  survivehr_backend.py  FineTuneDataset  (fine-tune only)
   target_token      [n]   int64     ← vocab ID of the outcome event
-  target_age_delta  [n]   float32   ← (target_age − last_age) / time_scale
+  target_age_delta  [n]   float32   ← (target_age − last_age) / outcome_horizon
        │
        ▼  torch DataLoader
   batched tensors → transformer backbone → survival ODE head → loss / CDF</code></pre>

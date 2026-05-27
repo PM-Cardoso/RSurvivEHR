@@ -68,11 +68,13 @@ A `data.frame` with one row per patient and columns:
 ## Details
 
 The value head is trained during pre-training on events that carried
-non-`NA` `value` entries. For events that never appeared with a value
-(e.g. `"CVD"`, which is a discrete diagnosis), the function returns
-`NaN` for both the mean and standard deviation. The head is preserved in
-fine-tuned bundles because fine-tuning only replaces the outcome
-survival head, not the backbone.
+non-`NA` `value` entries. Values are standardised internally per event
+(event-specific z-score using pre-training mean/sd) and predictions are
+automatically transformed back to original units before returning to R.
+For events that never appeared with a value (e.g. `"CVD"`, which is a
+discrete diagnosis), the function returns `NaN` for both the mean and
+standard deviation. The head is preserved in fine-tuned bundles because
+fine-tuning only replaces the outcome survival head, not the backbone.
 
 ## Examples
 

@@ -271,12 +271,11 @@ print(bp_preds)
 > predictions. In this vignette, `BP_CHECK`, `HBA1C` are the only such
 > events. All others return `NaN`.
 
-> **Value scale**: the model stores and predicts values in exactly the
-> units you supply — no internal standardisation is applied. When
-> different event types carry measurements on very different scales
-> (e.g. BP ~140 mmHg vs HbA1c ~70 mmol/mol), pre-normalise the `value`
-> column before training and back-transform predictions afterwards. See
-> the *Advanced topics* vignette for a worked example.
+> **Value scale (automatic)**: numeric `value` inputs are now
+> standardised internally **per event type** (event-specific z-score
+> from pre-training). The same event-specific mapping is reused in
+> fine-tuning and prediction, and returned predictions are automatically
+> back-transformed to the original units.
 
 ------------------------------------------------------------------------
 

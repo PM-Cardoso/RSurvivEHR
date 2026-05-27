@@ -92,7 +92,8 @@ survivehr_finetune(
 
 A named list (fine-tuned model bundle) with the same structure as the
 pre-trained bundle plus fine-tune-specific fields, including
-`training_duration_secs` (wall-clock seconds for this fine-tune run).
+`training_duration_secs` (wall-clock seconds for this fine-tune run) and
+inherited `value_standardization` metadata from the pretrained bundle.
 Pass to
 [`survivehr_predict()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.md)
 or

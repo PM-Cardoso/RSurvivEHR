@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -554,32 +554,17 @@ regression head that is trained alongside the survival backbone when
 <p>The head returns <code>NaN</code> for events that never carried a
 non-<code>NA</code> <code>value</code> at pre-training time
 (e.g. discrete diagnoses like <code>"CVD"</code>).</p>
-<p><strong>Important — value scale</strong>: the model applies no
-internal standardisation to the <code>value</code> column. The head is
-trained and predicts in whatever units you supply. For measurements on
-very different scales (e.g. BP in mmHg ~140 vs HbA1c in mmol/mol ~70) or
-large absolute values, pre-normalise before training and back-transform
-predictions afterwards:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Example: z-score per event type before training</span></span>
-<span><span class="va">scalers</span> <span class="op">&lt;-</span> <span class="va">events_pop</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">filter</span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">value</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">group_by</span><span class="op">(</span><span class="va">event</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">summarise</span><span class="op">(</span>v_mean <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">value</span><span class="op">)</span>, v_sd <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/sd.html" class="external-link">sd</a></span><span class="op">(</span><span class="va">value</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">events_scaled</span> <span class="op">&lt;-</span> <span class="va">events_pop</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">left_join</span><span class="op">(</span><span class="va">scalers</span>, by <span class="op">=</span> <span class="st">"event"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">mutate</span><span class="op">(</span>value <span class="op">=</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">if_else</span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">value</span><span class="op">)</span>,</span>
-<span>                                        <span class="op">(</span><span class="va">value</span> <span class="op">-</span> <span class="va">v_mean</span><span class="op">)</span> <span class="op">/</span> <span class="va">v_sd</span>, <span class="cn">NA_real_</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">select</span><span class="op">(</span><span class="va">patient_id</span>, <span class="va">event</span>, <span class="va">age</span>, <span class="va">value</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># After survivehr_predict_value(), back-transform:</span></span>
-<span><span class="va">preds</span> <span class="op">&lt;-</span> <span class="va">preds</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">left_join</span><span class="op">(</span><span class="va">scalers</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"outcome_event"</span> <span class="op">=</span> <span class="st">"event"</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu">mutate</span><span class="op">(</span></span>
-<span>    predicted_value_mean <span class="op">=</span> <span class="va">predicted_value_mean</span> <span class="op">*</span> <span class="va">v_sd</span> <span class="op">+</span> <span class="va">v_mean</span>,</span>
-<span>    predicted_value_sd   <span class="op">=</span> <span class="va">predicted_value_sd</span>   <span class="op">*</span> <span class="va">v_sd</span></span>
-<span>  <span class="op">)</span></span></code></pre></div>
+<p><strong>Important — value scale</strong>: <code>RSurvivEHR</code> now
+applies automatic internal standardisation for numeric values
+<strong>per event type</strong>. During pre-training,
+non-<code>NA</code> <code>value</code> rows are used to fit
+event-specific mean/sd statistics. These statistics are stored in the
+model bundle and reused in fine-tuning and prediction so all downstream
+value inputs are transformed consistently.</p>
+<p>Returned value outputs (<code>generated_value</code>,
+<code>predicted_value_mean</code>, <code>predicted_value_sd</code>) are
+automatically back-transformed to original units, so no manual
+pre-normalisation or post-hoc back-transform is required.</p>
 <p>Fine-tuned bundles retain the backbone’s value regression head, so
 <code><a href="../reference/survivehr_predict_value.html">survivehr_predict_value()</a></code> works equally with pretrain and
 fine-tuned bundles.</p>
@@ -593,13 +578,13 @@ fine-tuned bundles.</p>
 The first call to any training function will attempt to import PyTorch,
 pandas, and numpy. If these are not available in the current Python
 environment, install them:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">reticulate</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/reticulate/reference/py_install.html" class="external-link">py_install</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"torch"</span>, <span class="st">"pandas"</span>, <span class="st">"numpy"</span>, <span class="st">"lightning"</span><span class="op">)</span>,</span>
 <span>  pip <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>To pin a specific Python interpreter:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">reticulate</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/reticulate/reference/use_python.html" class="external-link">use_python</a></span><span class="op">(</span><span class="st">"/path/to/python"</span>, required <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p>See
 <code><a href="https://rstudio.github.io/reticulate/articles/python_dependencies.html" class="external-link">vignette("python_dependencies", package = "reticulate")</a></code> for

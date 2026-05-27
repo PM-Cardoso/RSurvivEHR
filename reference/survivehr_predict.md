@@ -103,8 +103,9 @@ per patient:
 
 - `generated_value`:
 
-  Predicted numeric value for that event (e.g. a lab result); `NaN` for
-  non-measurement events.
+  Predicted numeric value for that event (e.g. a lab result) in the
+  original input units (automatically de-standardised per event); `NaN`
+  for non-measurement events.
 
 ## Details
 
