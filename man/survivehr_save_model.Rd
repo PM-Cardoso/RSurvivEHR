@@ -17,8 +17,9 @@ Invisibly returns \code{path}.
 \description{
 Serialises a model bundle (returned by \code{survivehr_pretrain()} or
 \code{survivehr_finetune()}) to a \code{.pt} file.  The bundle includes the
-model weights, vocabulary, static column schema, \code{time_scale}, token
-policy, and training history.  Reload with \code{survivehr_load_model()}.
+model weights, vocabulary, static column schema, \code{time_scale},
+\code{value_standardization}, token policy, and training history.
+Reload with \code{survivehr_load_model()}.
 }
 \examples{
 \dontrun{

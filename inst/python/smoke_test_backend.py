@@ -39,19 +39,22 @@ def main() -> None:
         "batch_size": 2,
         "learning_rate": 1e-3,
         "surv_layer": "competing-risk",
-        "time_scale": 5.0,  # 5-year prediction window (ages in years)
+        "time_scale": 1.0,
+        "outcome_horizon": 5.0,
     }
 
     pre = train_pretrain_model(events, static_df=static_df, config=config)
+    assert "value_standardization" in pre
     ft = train_finetune_model(
         events_df=events,
         targets_df=targets,
         outcomes=["CVD"],
-        risk_model="competing-risk",
+        risk_model="single-risk",
         static_df=static_df,
         config=config,
         pretrained_bundle=pre,
     )
+    assert "value_standardization" in ft
 
     pred = predict_next_events(ft, events_df=events, static_df=static_df, max_new_tokens=1)
     print(pred.head())

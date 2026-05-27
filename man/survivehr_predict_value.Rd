@@ -47,7 +47,10 @@ alongside a specific clinical event, given each patient's history in
 }
 \details{
 The value head is trained during pre-training on events that carried
-non-\code{NA} \code{value} entries.  For events that never appeared with a value
+non-\code{NA} \code{value} entries.  Values are standardised internally per event
+(event-specific z-score using pre-training mean/sd) and predictions are
+automatically transformed back to original units before returning to R.
+For events that never appeared with a value
 (e.g. \code{"CVD"}, which is a discrete diagnosis), the function returns \code{NaN}
 for both the mean and standard deviation.  The head is preserved in
 fine-tuned bundles because fine-tuning only replaces the outcome survival

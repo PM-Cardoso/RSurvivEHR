@@ -42,6 +42,12 @@ token IDs (frequency-descending order, most common = smallest ID).}
 \item{\code{time_scale}}{The backbone age normalisation divisor stored in
 the bundle.  Used to normalise context ages before they enter the
 transformer; inherited automatically at fine-tune time.}
+\item{\code{value_standardization}}{Per-event value scaling metadata learned
+during pre-training from non-\code{NA} \code{value} rows.  For each event with
+observed numeric values, the bundle stores event-specific mean/sd used
+for internal z-score standardisation.  The same mapping is reused in
+fine-tuning and prediction, and value predictions are de-standardised
+back to original units before being returned to R.}
 \item{\code{token_policy}}{Token policy flags (\code{include_unk},
 \code{include_cls_sep}).}
 \item{\code{history}}{List of per-epoch training losses.}

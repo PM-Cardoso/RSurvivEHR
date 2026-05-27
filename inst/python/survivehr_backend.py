@@ -213,6 +213,186 @@ def _clean_targets(targets_df: pd.DataFrame) -> pd.DataFrame:
     return targets
 
 
+def _fit_value_standardization(events: pd.DataFrame) -> Dict[str, Any]:
+    """Fit per-event z-score statistics on non-missing event values.
+
+    Parameters
+    ----------
+    events:
+        Cleaned events frame containing at least ``event`` and ``value``.
+
+    Returns
+    -------
+    dict
+        Standardization payload persisted in model bundles.
+    """
+    out: Dict[str, Any] = {
+        "method": "zscore_by_event",
+        "stats": {},
+        "fitted": False,
+    }
+
+    if "event" not in events.columns or "value" not in events.columns:
+        return out
+
+    usable = events.loc[events["value"].notna(), ["event", "value"]].copy()
+    if usable.empty:
+        return out
+
+    stats: Dict[str, Dict[str, Any]] = {}
+    for event_name, group in usable.groupby("event", sort=False):
+        values = pd.to_numeric(group["value"], errors="coerce").dropna().to_numpy(dtype=np.float64)
+        if values.size == 0:
+            continue
+
+        mean = float(np.mean(values))
+        sd_raw = float(np.std(values, ddof=0))
+        is_constant = (not np.isfinite(sd_raw)) or sd_raw <= 1e-12
+        sd = 1.0 if is_constant else sd_raw
+
+        stats[str(event_name)] = {
+            "mean": mean,
+            "sd": float(sd),
+            "n": int(values.size),
+            "is_constant": bool(is_constant),
+        }
+
+    out["stats"] = stats
+    out["fitted"] = len(stats) > 0
+    return out
+
+
+def _normalise_value_standardization(value_standardization: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Normalise and validate persisted value standardization metadata."""
+    base = {
+        "method": "zscore_by_event",
+        "stats": {},
+        "fitted": False,
+    }
+    if value_standardization is None:
+        return base
+
+    payload = dict(value_standardization)
+    payload_method = str(payload.get("method", "zscore_by_event"))
+    stats_in = payload.get("stats", {})
+    stats_in = dict(stats_in) if isinstance(stats_in, dict) else {}
+
+    stats_out: Dict[str, Dict[str, Any]] = {}
+    for event_name, st in stats_in.items():
+        if not isinstance(st, dict):
+            continue
+        mean = st.get("mean", 0.0)
+        sd = st.get("sd", 1.0)
+        n = st.get("n", 0)
+        try:
+            mean_f = float(mean)
+            sd_f = float(sd)
+            n_i = int(n)
+        except Exception:
+            continue
+
+        if (not np.isfinite(sd_f)) or sd_f <= 1e-12:
+            sd_f = 1.0
+
+        stats_out[str(event_name)] = {
+            "mean": mean_f,
+            "sd": sd_f,
+            "n": n_i,
+            "is_constant": bool(st.get("is_constant", False)),
+        }
+
+    return {
+        "method": payload_method,
+        "stats": stats_out,
+        "fitted": bool(len(stats_out) > 0),
+    }
+
+
+def _standardize_events_df(events: pd.DataFrame,
+                           value_standardization: Optional[Dict[str, Any]]) -> pd.DataFrame:
+    """Apply per-event z-score standardization to event ``value`` column."""
+    out = events.copy()
+    if "value" not in out.columns or "event" not in out.columns:
+        return out
+
+    vs = _normalise_value_standardization(value_standardization)
+    stats = vs.get("stats", {})
+    if not stats:
+        return out
+
+    for event_name, st in stats.items():
+        mask = (out["event"] == event_name) & out["value"].notna()
+        if not bool(mask.any()):
+            continue
+        mean = float(st["mean"])
+        sd = float(st["sd"])
+        out.loc[mask, "value"] = (out.loc[mask, "value"].astype(float) - mean) / sd
+
+    return out
+
+
+def _standardize_targets_df(targets: pd.DataFrame,
+                            value_standardization: Optional[Dict[str, Any]]) -> pd.DataFrame:
+    """Apply per-event z-score standardization to target ``target_value`` column."""
+    out = targets.copy()
+    if "target_value" not in out.columns or "target_event" not in out.columns:
+        return out
+
+    vs = _normalise_value_standardization(value_standardization)
+    stats = vs.get("stats", {})
+    if not stats:
+        return out
+
+    for event_name, st in stats.items():
+        mask = (out["target_event"] == event_name) & out["target_value"].notna()
+        if not bool(mask.any()):
+            continue
+        mean = float(st["mean"])
+        sd = float(st["sd"])
+        out.loc[mask, "target_value"] = (out.loc[mask, "target_value"].astype(float) - mean) / sd
+
+    return out
+
+
+def _inverse_standardized_value(value: float,
+                                event_name: Optional[str],
+                                value_standardization: Optional[Dict[str, Any]]) -> float:
+    """Map a standardized value prediction back to the original event scale."""
+    if not np.isfinite(value):
+        return float(value)
+    if event_name is None:
+        return float(value)
+
+    vs = _normalise_value_standardization(value_standardization)
+    stats = vs.get("stats", {})
+    st = stats.get(str(event_name), None)
+    if st is None:
+        return float(value)
+
+    mean = float(st["mean"])
+    sd = float(st["sd"])
+    return float((value * sd) + mean)
+
+
+def _inverse_standardized_sd(sd_value: float,
+                             event_name: Optional[str],
+                             value_standardization: Optional[Dict[str, Any]]) -> float:
+    """Map a standardized SD prediction back to the original event scale."""
+    if not np.isfinite(sd_value):
+        return float(sd_value)
+    if event_name is None:
+        return float(sd_value)
+
+    vs = _normalise_value_standardization(value_standardization)
+    stats = vs.get("stats", {})
+    st = stats.get(str(event_name), None)
+    if st is None:
+        return float(sd_value)
+
+    scale = float(st["sd"])
+    return float(sd_value * scale)
+
+
 def _padded_sequence(values: List[float], block_size: int, pad_value: float) -> np.ndarray:
     arr = np.full(block_size, pad_value, dtype=np.float32)
     take = values[-block_size:]
@@ -719,7 +899,11 @@ def train_pretrain_model(events_df: pd.DataFrame,
     token_policy = _token_policy_from_config(config)
     time_scale = float(config.get("time_scale", 1.0))
 
-    built = _build_context_data(events_df=events_df,
+    events_clean = _clean_events(events_df)
+    value_standardization = _fit_value_standardization(events_clean)
+    events_std = _standardize_events_df(events_clean, value_standardization)
+
+    built = _build_context_data(events_df=events_std,
                                 static_df=static_df,
                                 block_size=int(config.get("block_size", 128)),
                                 event_vocab=event_vocab,
@@ -750,6 +934,7 @@ def train_pretrain_model(events_df: pd.DataFrame,
         "inv_vocab": built.inv_vocab,
         "block_size": int(config.get("block_size", 128)),
         "time_scale": built.time_scale,
+        "value_standardization": value_standardization,
         "token_policy": token_policy,
         "static_raw_cols": built.static_raw_cols,
         "static_col_names": built.static_col_names,
@@ -771,6 +956,7 @@ def train_finetune_model(events_df: pd.DataFrame,
     device = _device_from_config(config)
     token_policy = _token_policy_from_config(config)
     time_scale = float(config.get("time_scale", 1.0))
+    value_standardization = None
 
     # outcome_horizon: the ODE prediction window length (raw age units).
     # Independent of time_scale — can differ freely.
@@ -784,12 +970,21 @@ def train_finetune_model(events_df: pd.DataFrame,
         # Always inherit time_scale from the pretrained bundle so context
         # normalisation is identical between pretrain and fine-tune.
         time_scale = float(pretrained_bundle.get("time_scale", time_scale))
+        value_standardization = _normalise_value_standardization(pretrained_bundle.get("value_standardization", None))
+
+    events_clean = _clean_events(events_df)
+    if value_standardization is None:
+        value_standardization = _fit_value_standardization(events_clean)
+    events_std = _standardize_events_df(events_clean, value_standardization)
+
+    targets_clean = _clean_targets(targets_df)
+    targets_std = _standardize_targets_df(targets_clean, value_standardization)
 
     # Resolve outcome_horizon now that time_scale is finalised.
     if outcome_horizon is None:
         outcome_horizon = time_scale
 
-    built = _build_context_data(events_df=events_df,
+    built = _build_context_data(events_df=events_std,
                                 static_df=static_df,
                                 block_size=int(config.get("block_size", 128)),
                                 event_vocab=event_vocab,
@@ -845,7 +1040,7 @@ def train_finetune_model(events_df: pd.DataFrame,
 
     outcome_tokens = [built.event_vocab[o] for o in outcomes]
 
-    ds = FineTuneDataset(built, targets_df=targets_df, outcome_horizon=outcome_horizon)
+    ds = FineTuneDataset(built, targets_df=targets_std, outcome_horizon=outcome_horizon)
     loader = DataLoader(ds, batch_size=int(config.get("batch_size", 16)), shuffle=True)
 
     model = FineTuneExperiment(cfg=cfg, outcome_tokens=outcome_tokens, risk_model=risk_model, vocab_size=len(built.event_vocab))
@@ -904,6 +1099,7 @@ def train_finetune_model(events_df: pd.DataFrame,
         "inv_vocab": built.inv_vocab,
         "block_size": int(config.get("block_size", 128)),
         "time_scale": built.time_scale,
+        "value_standardization": value_standardization,
         "outcome_horizon": outcome_horizon,
         "outcomes": list(outcomes),  # always a list — guards against reticulate round-trip
         "risk_model": risk_model,
@@ -924,9 +1120,12 @@ def predict_next_events(model_bundle: Dict[str, Any],
     model = model_bundle["model"]
     event_vocab = dict(model_bundle["event_vocab"])
     inv_vocab = {int(k): v for k, v in dict(model_bundle["inv_vocab"]).items()}
+    value_standardization = _normalise_value_standardization(model_bundle.get("value_standardization", None))
 
     block_size = int(model_bundle["block_size"])
-    built = _build_context_data(events_df=events_df,
+    events_clean = _clean_events(events_df)
+    events_std = _standardize_events_df(events_clean, value_standardization)
+    built = _build_context_data(events_df=events_std,
                                 static_df=static_df,
                                 block_size=block_size,
                                 event_vocab=event_vocab,
@@ -973,14 +1172,19 @@ def predict_next_events(model_bundle: Dict[str, Any],
                     tok = int(out_tokens[i, pos].detach().cpu().item())
                     age_norm = float(out_ages[i, pos].detach().cpu().item())
                     value_val = float(out_values[i, pos].detach().cpu().item())
+                    event_name = inv_vocab.get(tok, "<UNK>")
                     rows.append(
                         {
                             "patient_id": pid,
                             "step": step_num,
                             "generated_token": tok,
-                            "generated_event": inv_vocab.get(tok, "<UNK>"),
+                            "generated_event": event_name,
                             "generated_age": age_norm * time_scale,
-                            "generated_value": value_val,
+                            "generated_value": _inverse_standardized_value(
+                                value=value_val,
+                                event_name=event_name,
+                                value_standardization=value_standardization,
+                            ),
                         }
                     )
         else:
@@ -1085,6 +1289,7 @@ def predict_outcome_value(model_bundle: Dict[str, Any],
     """
     outcome_event = str(outcome_event)
     event_vocab = dict(model_bundle["event_vocab"])
+    value_standardization = _normalise_value_standardization(model_bundle.get("value_standardization", None))
 
     if outcome_event not in event_vocab:
         raise ValueError(
@@ -1103,9 +1308,11 @@ def predict_outcome_value(model_bundle: Dict[str, Any],
     backbone = model.model if hasattr(model, "model") else model
     block_size = int(model_bundle["block_size"])
     time_scale = float(model_bundle.get("time_scale", 1.0))
+    events_clean = _clean_events(events_df)
+    events_std = _standardize_events_df(events_clean, value_standardization)
 
     built = _build_context_data(
-        events_df=events_df,
+        events_df=events_std,
         static_df=static_df,
         block_size=block_size,
         event_vocab=event_vocab,
@@ -1143,8 +1350,18 @@ def predict_outcome_value(model_bundle: Dict[str, Any],
         ):
             dist = values_dist[token_key]
             # dist.loc / dist.scale: shape (bsz, 1) — squeeze seq_len dim
-            mean_val = float(dist.loc[i, 0].cpu().item())
-            sd_val = float(dist.scale[i, 0].cpu().item())
+            mean_std = float(dist.loc[i, 0].cpu().item())
+            sd_std = float(dist.scale[i, 0].cpu().item())
+            mean_val = _inverse_standardized_value(
+                value=mean_std,
+                event_name=outcome_event,
+                value_standardization=value_standardization,
+            )
+            sd_val = _inverse_standardized_sd(
+                sd_value=sd_std,
+                event_name=outcome_event,
+                value_standardization=value_standardization,
+            )
         rows.append(
             {
                 "patient_id": pid,
@@ -1174,6 +1391,7 @@ def save_model_bundle(model_bundle: Dict[str, Any], path: str) -> None:
         "inv_vocab": model_bundle["inv_vocab"],
         "block_size": model_bundle["block_size"],
         "time_scale": model_bundle.get("time_scale", 1.0),
+        "value_standardization": _normalise_value_standardization(model_bundle.get("value_standardization", None)),
         "outcome_horizon": model_bundle.get("outcome_horizon", model_bundle.get("time_scale", 1.0)),
         "outcomes": _outcomes,
         "risk_model": model_bundle.get("risk_model", "competing-risk"),
@@ -1217,6 +1435,7 @@ def load_model_bundle(path: str) -> Dict[str, Any]:
         "inv_vocab": payload["inv_vocab"],
         "block_size": int(payload["block_size"]),
         "time_scale": float(payload.get("time_scale", 1.0)),
+        "value_standardization": _normalise_value_standardization(payload.get("value_standardization", None)),
         "outcome_horizon": float(payload.get("outcome_horizon", payload.get("time_scale", 1.0))),
         "outcomes": outcomes if kind == "finetune" else payload.get("outcomes", None),
         "risk_model": payload.get("risk_model", "competing-risk"),

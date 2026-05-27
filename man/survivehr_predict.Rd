@@ -57,7 +57,8 @@ per patient:
 \item{\code{generated_age}}{Predicted age of the generated event in the same
 units as \code{age} (de-normalised by \code{time_scale}).}
 \item{\code{generated_value}}{Predicted numeric value for that event (e.g.
-a lab result); \code{NaN} for non-measurement events.}
+a lab result) in the original input units (automatically
+de-standardised per event); \code{NaN} for non-measurement events.}
 }
 }
 \description{

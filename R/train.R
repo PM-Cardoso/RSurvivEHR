@@ -35,6 +35,12 @@
 #'     \item{`time_scale`}{The backbone age normalisation divisor stored in
 #'       the bundle.  Used to normalise context ages before they enter the
 #'       transformer; inherited automatically at fine-tune time.}
+#'     \item{`value_standardization`}{Per-event value scaling metadata learned
+#'       during pre-training from non-`NA` `value` rows.  For each event with
+#'       observed numeric values, the bundle stores event-specific mean/sd used
+#'       for internal z-score standardisation.  The same mapping is reused in
+#'       fine-tuning and prediction, and value predictions are de-standardised
+#'       back to original units before being returned to R.}
 #'     \item{`token_policy`}{Token policy flags (`include_unk`,
 #'       `include_cls_sep`).}
 #'     \item{`history`}{List of per-epoch training losses.}
@@ -186,7 +192,8 @@ survivehr_pretrain <- function(events,
 #'   vocabulary.  Rarely needed; prefer supplying `pretrained_model`.
 #' @return A named list (fine-tuned model bundle) with the same structure
 #'   as the pre-trained bundle plus fine-tune-specific fields, including
-#'   `training_duration_secs` (wall-clock seconds for this fine-tune run).
+#'   `training_duration_secs` (wall-clock seconds for this fine-tune run) and
+#'   inherited `value_standardization` metadata from the pretrained bundle.
 #'   Pass to `survivehr_predict()` or `survivehr_save_model()`.
 #' @export
 #' @examples
@@ -345,7 +352,8 @@ survivehr_finetune <- function(events,
 #'     \item{`generated_age`}{Predicted age of the generated event in the same
 #'       units as `age` (de-normalised by `time_scale`).}
 #'     \item{`generated_value`}{Predicted numeric value for that event (e.g.
-#'       a lab result); `NaN` for non-measurement events.}
+#'       a lab result) in the original input units (automatically
+#'       de-standardised per event); `NaN` for non-measurement events.}
 #'   }
 #' @export
 #' @examples
@@ -391,7 +399,10 @@ survivehr_predict <- function(model_bundle,
 #' `events`.
 #'
 #' The value head is trained during pre-training on events that carried
-#' non-`NA` `value` entries.  For events that never appeared with a value
+#' non-`NA` `value` entries.  Values are standardised internally per event
+#' (event-specific z-score using pre-training mean/sd) and predictions are
+#' automatically transformed back to original units before returning to R.
+#' For events that never appeared with a value
 #' (e.g. `"CVD"`, which is a discrete diagnosis), the function returns `NaN`
 #' for both the mean and standard deviation.  The head is preserved in
 #' fine-tuned bundles because fine-tuning only replaces the outcome survival
@@ -451,8 +462,9 @@ survivehr_predict_value <- function(model_bundle,
 #'
 #' Serialises a model bundle (returned by `survivehr_pretrain()` or
 #' `survivehr_finetune()`) to a `.pt` file.  The bundle includes the
-#' model weights, vocabulary, static column schema, `time_scale`, token
-#' policy, and training history.  Reload with `survivehr_load_model()`.
+#' model weights, vocabulary, static column schema, `time_scale`,
+#' `value_standardization`, token policy, and training history.
+#' Reload with `survivehr_load_model()`.
 #'
 #' @param model_bundle A model bundle returned by a training function.
 #' @param path File path for the output file.  Should end in `.pt`.
@@ -481,8 +493,8 @@ survivehr_save_model <- function(model_bundle, path) {
 #' @param path File path to a `.pt` bundle created by
 #'   `survivehr_save_model()`.
 #' @return A named list (model bundle) with elements `model`,
-#'   `event_vocab`, `inv_vocab`, `config`, `time_scale`, `token_policy`,
-#'   `history`, and `device`.
+#'   `event_vocab`, `inv_vocab`, `config`, `time_scale`,
+#'   `value_standardization`, `token_policy`, `history`, and `device`.
 #' @export
 #' @examples
 #' \dontrun{

@@ -12,7 +12,8 @@ survivehr_load_model(path)
 }
 \value{
 A named list (model bundle) with elements \code{model},
-\code{event_vocab}, \code{inv_vocab}, \code{config}, \code{time_scale}, \code{token_policy},
+\code{event_vocab}, \code{inv_vocab}, \code{config}, \code{time_scale},
+\code{value_standardization}, \code{token_policy},
 \code{history}, and \code{device}.
 }
 \description{

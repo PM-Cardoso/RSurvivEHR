@@ -379,33 +379,15 @@ bp_preds <- survivehr_predict_value(
 The head returns `NaN` for events that never carried a non-`NA` `value` at
 pre-training time (e.g. discrete diagnoses like `"CVD"`).
 
-**Important — value scale**: the model applies no internal standardisation to
-the `value` column.  The head is trained and predicts in whatever units you
-supply.  For measurements on very different scales (e.g. BP in mmHg ~140 vs
-HbA1c in mmol/mol ~70) or large absolute values, pre-normalise before training
-and back-transform predictions afterwards:
+**Important — value scale**: `RSurvivEHR` now applies automatic internal
+standardisation for numeric values **per event type**.  During pre-training,
+non-`NA` `value` rows are used to fit event-specific mean/sd statistics.
+These statistics are stored in the model bundle and reused in fine-tuning and
+prediction so all downstream value inputs are transformed consistently.
 
-```r
-# Example: z-score per event type before training
-scalers <- events_pop |>
-  dplyr::filter(!is.na(value)) |>
-  dplyr::group_by(event) |>
-  dplyr::summarise(v_mean = mean(value), v_sd = sd(value))
-
-events_scaled <- events_pop |>
-  dplyr::left_join(scalers, by = "event") |>
-  dplyr::mutate(value = dplyr::if_else(!is.na(value),
-                                        (value - v_mean) / v_sd, NA_real_)) |>
-  dplyr::select(patient_id, event, age, value)
-
-# After survivehr_predict_value(), back-transform:
-preds <- preds |>
-  dplyr::left_join(scalers, by = c("outcome_event" = "event")) |>
-  dplyr::mutate(
-    predicted_value_mean = predicted_value_mean * v_sd + v_mean,
-    predicted_value_sd   = predicted_value_sd   * v_sd
-  )
-```
+Returned value outputs (`generated_value`, `predicted_value_mean`,
+`predicted_value_sd`) are automatically back-transformed to original units,
+so no manual pre-normalisation or post-hoc back-transform is required.
 
 Fine-tuned bundles retain the backbone's value regression head, so
 `survivehr_predict_value()` works equally with pretrain and fine-tuned bundles.

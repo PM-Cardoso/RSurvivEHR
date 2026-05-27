@@ -57,7 +57,8 @@ vocabulary.  Rarely needed; prefer supplying \code{pretrained_model}.}
 \value{
 A named list (fine-tuned model bundle) with the same structure
 as the pre-trained bundle plus fine-tune-specific fields, including
-\code{training_duration_secs} (wall-clock seconds for this fine-tune run).
+\code{training_duration_secs} (wall-clock seconds for this fine-tune run) and
+inherited \code{value_standardization} metadata from the pretrained bundle.
 Pass to \code{survivehr_predict()} or \code{survivehr_save_model()}.
 }
 \description{
