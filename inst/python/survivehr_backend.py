@@ -36,6 +36,7 @@ if "wandb" not in sys.modules:
     sys.modules["wandb"] = _wandb_stub
 
 from SurvivEHR.experiments import CausalExperiment, FineTuneExperiment
+from iec_metrics import compute_iec_single, compute_iec_batch, compute_iec_stratified
 
 
 def _device_from_config(config: Dict[str, Any]) -> torch.device:
@@ -1246,133 +1247,126 @@ def predict_next_events(model_bundle: Dict[str, Any],
     return pd.DataFrame(rows)
 
 
-def predict_outcome_value(model_bundle: Dict[str, Any],
-                          events_df: pd.DataFrame,
-                          outcome_event: str,
-                          static_df: Optional[pd.DataFrame] = None) -> pd.DataFrame:
-    """Predict the numeric value of a named event from the backbone's value head.
-
-    The pre-trained transformer contains a Gaussian regression head that learns
-    to predict the numeric measurement recorded alongside each clinical event
-    (e.g. systolic blood pressure for BP_CHECK, HbA1c for HBA1C).  This
-    function queries that head for a specific ``outcome_event`` token, returning
-    the predicted mean and standard deviation for every patient in
-    ``events_df``.
-
-    Only event tokens that appeared with non-NaN ``value`` entries at
-    pre-training time will return meaningful (non-NaN) predictions.  Tokens
-    that never carried a numeric value return NaN.
-
-    Works with both pretrain and finetune model bundles: the fine-tuned bundle
-    retains the backbone's value regression head from pre-training.
-
-    Parameters
-    ----------
-    model_bundle:
-        Bundle returned by ``train_pretrain_model`` or ``train_finetune_model``
-        (or loaded with ``load_model_bundle``).
-    events_df:
-        Patient event history used as context.  Same format as for
-        ``predict_next_events``.  The outcome event code should *not* appear in
-        this frame (same leakage-free filtering as for fine-tuning).
-    outcome_event:
-        Event code whose value is to be predicted (e.g. ``"BP_CHECK"``).
-        Must be present in the model vocabulary.
-    static_df:
-        Optional static covariates frame (same columns as at training time).
-
-    Returns
-    -------
-    pandas.DataFrame with columns:
-        ``patient_id``, ``outcome_event``,
-        ``predicted_value_mean``, ``predicted_value_sd``.
+def extract_pretrain_risk_scores(model_bundle: Dict[str, Any],
+                                 events_df: pd.DataFrame,
+                                 static_df: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
+    """Extract risk scores for all event types at each transition (pretrain model only).
+    
+    For the pretrain model, this performs a forward pass (without sampling) to extract
+    the model's predicted risk for each possible next event at each transition.
+    
+    Returns per-transition risk scores: [sum(cdf) for cdf in outputs["surv"]["surv_CDF"]]
+    which approximates the integrated cumulative risk for each outcome.
+    
+    Args:
+        model_bundle: Pretrained model bundle with keys: model, event_vocab, etc.
+        events_df: Events data frame with patient event history.
+        static_df: Optional static covariates.
+    
+    Returns:
+        Dictionary with:
+            - "risk_scores": List of 2D numpy arrays, one per patient.
+              Each array has shape (n_transitions, n_events) where n_transitions
+              is the number of observed transitions for that patient.
+            - "patient_ids": List of patient IDs in the same order as risk_scores.
+            - "event_vocab": Dict mapping event ID to name.
+            - "n_events": Integer, total number of event types (vocabulary size).
+    
+    Raises:
+        ValueError: If model_bundle is not pretrain type.
     """
-    outcome_event = str(outcome_event)
-    event_vocab = dict(model_bundle["event_vocab"])
-    value_standardization = _normalise_value_standardization(model_bundle.get("value_standardization", None))
-
-    if outcome_event not in event_vocab:
+    if model_bundle.get("type") != "pretrain":
         raise ValueError(
-            f"'{outcome_event}' is not in the model vocabulary. "
-            f"Known clinical events: "
-            f"{sorted(k for k in event_vocab if not k.startswith('<'))}."
+            f"extract_pretrain_risk_scores() only supports pretrain models, "
+            f"got type={model_bundle.get('type')}"
         )
-
-    outcome_token_id = int(event_vocab[outcome_event])
-    token_key = f"Token {outcome_token_id}"
-
+    
     model = model_bundle["model"]
-    # Both CausalExperiment (pretrain) and FineTuneExperiment (finetune)
-    # expose the shared backbone as .model (SurvStreamGPTForCausalModelling),
-    # which carries the trained Gaussian value regression head.
-    backbone = model.model if hasattr(model, "model") else model
+    event_vocab = dict(model_bundle["event_vocab"])
+    inv_vocab = {int(k): v for k, v in dict(model_bundle["inv_vocab"]).items()}
+    value_standardization = _normalise_value_standardization(
+        model_bundle.get("value_standardization", None)
+    )
+    
     block_size = int(model_bundle["block_size"])
-    time_scale = float(model_bundle.get("time_scale", 1.0))
     events_clean = _clean_events(events_df)
     events_std = _standardize_events_df(events_clean, value_standardization)
-
     built = _build_context_data(
         events_df=events_std,
         static_df=static_df,
         block_size=block_size,
         event_vocab=event_vocab,
         token_policy=model_bundle.get("token_policy", None),
-        time_scale=time_scale,
+        time_scale=float(model_bundle.get("time_scale", 1.0)),
         reference_static_cols=model_bundle.get("static_raw_cols", None),
-        reference_static_encoded_cols=model_bundle.get("static_col_names", None),
+        reference_static_encoded_cols=model_bundle.get("static_col_names", None)
     )
-
-    device = next(backbone.parameters()).device
-
-    backbone.eval()
+    
+    device = next(model.parameters()).device
+    
+    tokens = torch.tensor(built.tokens, dtype=torch.long, device=device)
+    ages = torch.tensor(built.ages, dtype=torch.float32, device=device)
+    values = torch.tensor(built.values, dtype=torch.float32, device=device)
+    attention_mask = torch.tensor(built.attention_mask, dtype=torch.float32, device=device)
+    static_cov = torch.tensor(built.static_covariates, dtype=torch.float32, device=device)
+    
+    model.eval()
     with torch.no_grad():
-        outputs, _, _ = backbone(
-            tokens=torch.tensor(built.tokens, dtype=torch.long, device=device),
-            ages=torch.tensor(built.ages, dtype=torch.float32, device=device),
-            values=torch.tensor(built.values, dtype=torch.float32, device=device),
-            covariates=torch.tensor(built.static_covariates, dtype=torch.float32, device=device),
-            attention_mask=torch.tensor(built.attention_mask, dtype=torch.float32, device=device),
-            is_generation=True,
-            return_generation=True,
-            return_loss=False,
-        )
-
-    values_dist = outputs.get("values_dist") if isinstance(outputs, dict) else None
-
-    rows = []
-    for i, pid in enumerate(built.patient_ids):
-        mean_val = float("nan")
-        sd_val = float("nan")
-        if (
-            values_dist is not None
-            and isinstance(values_dist, dict)
-            and token_key in values_dist
-        ):
-            dist = values_dist[token_key]
-            # dist.loc / dist.scale: shape (bsz, 1) — squeeze seq_len dim
-            mean_std = float(dist.loc[i, 0].cpu().item())
-            sd_std = float(dist.scale[i, 0].cpu().item())
-            mean_val = _inverse_standardized_value(
-                value=mean_std,
-                event_name=outcome_event,
-                value_standardization=value_standardization,
-            )
-            sd_val = _inverse_standardized_sd(
-                sd_value=sd_std,
-                event_name=outcome_event,
-                value_standardization=value_standardization,
-            )
-        rows.append(
-            {
-                "patient_id": pid,
-                "outcome_event": outcome_event,
-                "predicted_value_mean": mean_val,
-                "predicted_value_sd": sd_val,
-            }
-        )
-
-    return pd.DataFrame(rows)
-
+        base_model = model.model if hasattr(model, "model") else model
+        
+        # Forward pass without generation to get model outputs (including CDFs)
+        # We'll wrap this in the same batch format as the model expects
+        batch = {
+            "tokens": tokens,
+            "ages": ages,
+            "values": values,
+            "attention_mask": attention_mask,
+            "static_covariates": static_cov,
+            "target_token": torch.zeros(tokens.shape[0], dtype=torch.long, device=device),
+            "target_age_delta": torch.zeros(tokens.shape[0], dtype=torch.float32, device=device),
+            "target_value": torch.full((tokens.shape[0],), torch.nan, dtype=torch.float32, device=device),
+        }
+        
+        outputs, _, _ = base_model(batch, is_generation=False, return_loss=False, return_generation=True)
+        
+        if "surv" not in outputs:
+            raise ValueError("Model output does not contain 'surv' key. Check model forward pass.")
+        
+        cdfs_all = outputs["surv"]["surv_CDF"]
+        if not cdfs_all or len(cdfs_all) == 0:
+            raise ValueError("No CDFs returned from model. Model may not support CDF output.")
+        
+        n_events = len(cdfs_all)
+        
+        # Extract risk scores for each patient and transition
+        risk_scores_by_patient = []
+        patient_ids_list = []
+        
+        for i, pid in enumerate(built.patient_ids):
+            # Get number of valid transitions for this patient
+            n_transitions_i = int(built.attention_mask[i].sum()) - 1
+            if n_transitions_i <= 0:
+                continue
+            
+            # Extract CDFs for all events at all positions for this patient
+            # cdfs_all is list of ndarrays, each shape (n_patients, n_time_grid)
+            # We want risk scores per transition: [sum(cdf[i, :]) for cdf in cdfs_all]
+            
+            risk_scores_matrix = np.zeros((n_transitions_i, n_events))
+            for t in range(n_transitions_i):
+                for event_idx, cdf in enumerate(cdfs_all):
+                    # Sum CDF across time grid to get integrated risk
+                    risk_scores_matrix[t, event_idx] = float(np.sum(cdf[i, :]))
+            
+            risk_scores_by_patient.append(risk_scores_matrix)
+            patient_ids_list.append(pid)
+    
+    return {
+        "risk_scores": risk_scores_by_patient,
+        "patient_ids": patient_ids_list,
+        "event_vocab": event_vocab,
+        "n_events": n_events,
+    }
 
 def save_model_bundle(model_bundle: Dict[str, Any], path: str) -> None:
     # Normalise outcomes: reticulate may have converted ["CVD"] -> "CVD" (string)
