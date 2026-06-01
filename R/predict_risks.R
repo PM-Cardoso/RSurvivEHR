@@ -88,43 +88,32 @@ survivehr_predict_event_risks <- function(
   # Properly repeat patient IDs: one ID per row of risk matrix per patient
   patient_ids_py <- reticulate::py_to_r(py_result[["patient_ids"]])
   patient_ids <- unlist(Map(
-    function(pid, mat) rep(pid, nrow(mat)),
+    function(pid, mat) rep(as.character(pid), nrow(mat)),
     patient_ids_py,
     risk_scores
   ))
 
-  # Build event vocabulary mapping for IEC
-  # event_vocab from Python is a dict (token_id -> event_name)
-  # For R/IEC we need: event_name -> matrix_column_index (1-indexed)
-  # The risk matrix has n_events columns, so column indices are 1 to n_events
-  event_vocab_py <- reticulate::py_to_r(py_result[["event_vocab"]])
-  n_events <- py_result[["n_events"]]
+  # Build event vocabulary mapping for IEC using the explicit vocab table
+  # This avoids fragile dict conversion and ensures event names are preserved
+  vocab_table <- as.data.frame(
+    reticulate::py_to_r(py_result[["event_vocab_table"]]),
+    stringsAsFactors = FALSE
+  )
   
-  # If event_vocab is a dict/list mapping token IDs to names:
-  # Convert to named vector: names are event names, values are matrix column indices
-  if (is.list(event_vocab_py)) {
-    # event_vocab_py is likely: list(0 = "<PAD>", 1 = "<UNK>", 2 = "HYPERTENSION", ...)
-    # We need: c("<PAD>" = 1, "<UNK>" = 2, "HYPERTENSION" = 3, ...)
-    event_names <- unlist(event_vocab_py)  # Convert to character vector with names (token IDs)
-    event_vocab_for_iec <- setNames(
-      seq_len(length(event_names)),
-      event_names
-    )
-  } else {
-    # If it's already a vector, reconstruct it
-    event_names <- as.character(event_vocab_py)
-    event_vocab_for_iec <- setNames(
-      seq_len(length(event_names)),
-      event_names
-    )
-  }
+  vocab_table$event_id <- as.integer(vocab_table$event_id)
+  vocab_table <- vocab_table[order(vocab_table$event_id), ]
+  
+  # Create named vector: event_name -> event_id (for IEC)
+  event_names <- vocab_table$event
+  event_vocab_for_iec <- setNames(vocab_table$event_id, vocab_table$event)
 
   return(list(
     risk_scores = risk_scores,
     patient_ids = patient_ids,
     event_vocab = event_vocab_for_iec,
-    event_names = names(event_vocab_for_iec),
-    n_events = n_events
+    event_names = event_names,
+    event_vocab_table = vocab_table,
+    n_events = py_result[["n_events"]]
   ))
 }
 

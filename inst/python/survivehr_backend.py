@@ -1430,10 +1430,24 @@ def extract_pretrain_risk_scores(model_bundle: Dict[str, Any],
         
         print(f"\n[IEC DEBUG] Total risk matrices appended: {len(risk_scores_by_patient)}", flush=True)
     
+    # Build explicit vocabulary table for R
+    # Only include events with token IDs 1..n_events (exclude <PAD> at 0)
+    vocab_records = []
+    for event_name, token_id in event_vocab.items():
+        token_id = int(token_id)
+        if token_id >= 1 and token_id <= n_events:
+            vocab_records.append({
+                "event": str(event_name),
+                "event_id": token_id
+            })
+    
+    vocab_records = sorted(vocab_records, key=lambda x: x["event_id"])
+    
     return {
         "risk_scores": risk_scores_by_patient,
         "patient_ids": patient_ids_list,
         "event_vocab": event_vocab,
+        "event_vocab_table": vocab_records,
         "n_events": n_events,
     }
 
