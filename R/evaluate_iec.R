@@ -195,12 +195,28 @@ survivehr_evaluate_iec <- function(
     rownames(by_event_df) <- NULL
   }
 
+  # Final overall summary
+  # If iec_values were not stored (aggregate_only=TRUE), compute overall from stratified table
+  if (length(all_iec_values) > 0) {
+    final_mean_iec <- mean(all_iec_values, na.rm = TRUE)
+    final_n_valid <- sum(!is.na(all_iec_values))
+  } else if (!is.null(by_event_df) && nrow(by_event_df) > 0) {
+    # Fallback: compute weighted mean from stratified results
+    final_n_valid <- sum(by_event_df$n_obs, na.rm = TRUE)
+    final_mean_iec <- if (final_n_valid > 0) {
+      sum(by_event_df$mean_iec * by_event_df$n_obs, na.rm = TRUE) / final_n_valid
+    } else {
+      0
+    }
+  } else {
+    final_mean_iec <- 0
+    final_n_valid <- 0
+  }
+
   # Create result object
-  # n_valid = count of non-NA IEC values
-  # n_total = total transitions processed (from observed_events)
   result <- list(
-    mean_iec = if (length(all_iec_values) > 0) mean(all_iec_values, na.rm = TRUE) else 0,
-    n_valid = sum(!is.na(all_iec_values)),
+    mean_iec = final_mean_iec,
+    n_valid = final_n_valid,
     n_total = length(all_observed_events),
     iec_values = if (aggregate_only) NULL else all_iec_values,
     observed_ranks = if (aggregate_only) NULL else all_observed_ranks,
