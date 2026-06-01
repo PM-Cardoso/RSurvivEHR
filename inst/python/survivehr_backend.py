@@ -1332,9 +1332,12 @@ def extract_pretrain_risk_scores(model_bundle: Dict[str, Any],
     print(f"  n_patients: {len(built.patient_ids)}", flush=True)
     print(f"  tokens shape: {len(built.tokens)}", flush=True)
     print(f"  attention_mask length: {len(built.attention_mask)}", flush=True)
-    if built.attention_mask:
-        att_sums = [int(sum(mask)) if isinstance(mask, list) else int(mask.sum()) for mask in built.attention_mask[:min(5, len(built.attention_mask))]]
-        print(f"  attention_mask sums (first 5): {att_sums}", flush=True)
+    if built.attention_mask is not None and len(built.attention_mask) > 0:
+        try:
+            att_sums = [int(sum(mask)) if isinstance(mask, list) else int(mask.sum()) for mask in built.attention_mask[:min(5, len(built.attention_mask))]]
+            print(f"  attention_mask sums (first 5): {att_sums}", flush=True)
+        except Exception as e:
+            print(f"  (could not compute attention_mask sums: {e})", flush=True)
     
     device = next(model.parameters()).device
     
@@ -1389,8 +1392,12 @@ def extract_pretrain_risk_scores(model_bundle: Dict[str, Any],
         print(f"  batch attention_mask shape: {attention_mask.shape}, dtype: {attention_mask.dtype}", flush=True)
         print(f"  n_events (vocab): {n_events}", flush=True)
         print(f"  n_patients: {len(built.patient_ids)}", flush=True)
-        print(f"  First 5 attention_mask sums: {[int(attention_mask[j].sum().item()) if hasattr(attention_mask[j].sum(), 'item') else int(attention_mask[j].sum()) for j in range(min(5, len(attention_mask)))]}", flush=True)
-        if cdfs_all:
+        try:
+            att_sums = [int(attention_mask[j].sum().item()) if hasattr(attention_mask[j].sum(), 'item') else int(attention_mask[j].sum()) for j in range(min(5, len(attention_mask)))]
+            print(f"  First 5 attention_mask sums: {att_sums}", flush=True)
+        except Exception as e:
+            print(f"  (could not compute attention_mask sums: {e})", flush=True)
+        if cdfs_all is not None and len(cdfs_all) > 0:
             print(f"  First CDF shape: {cdfs_all[0].shape}", flush=True)
             print(f"  First CDF dtype: {cdfs_all[0].dtype}", flush=True)
             print(f"  CDFs list length: {len(cdfs_all)}", flush=True)
