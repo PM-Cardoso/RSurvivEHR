@@ -93,11 +93,38 @@ survivehr_predict_event_risks <- function(
     risk_scores
   ))
 
+  # Build event vocabulary mapping for IEC
+  # event_vocab from Python is a dict (token_id -> event_name)
+  # For R/IEC we need: event_name -> matrix_column_index (1-indexed)
+  # The risk matrix has n_events columns, so column indices are 1 to n_events
+  event_vocab_py <- reticulate::py_to_r(py_result[["event_vocab"]])
+  n_events <- py_result[["n_events"]]
+  
+  # If event_vocab is a dict/list mapping token IDs to names:
+  # Convert to named vector: names are event names, values are matrix column indices
+  if (is.list(event_vocab_py)) {
+    # event_vocab_py is likely: list(0 = "<PAD>", 1 = "<UNK>", 2 = "HYPERTENSION", ...)
+    # We need: c("<PAD>" = 1, "<UNK>" = 2, "HYPERTENSION" = 3, ...)
+    event_names <- unlist(event_vocab_py)  # Convert to character vector with names (token IDs)
+    event_vocab_for_iec <- setNames(
+      seq_len(length(event_names)),
+      event_names
+    )
+  } else {
+    # If it's already a vector, reconstruct it
+    event_names <- as.character(event_vocab_py)
+    event_vocab_for_iec <- setNames(
+      seq_len(length(event_names)),
+      event_names
+    )
+  }
+
   return(list(
     risk_scores = risk_scores,
     patient_ids = patient_ids,
-    event_vocab = reticulate::py_to_r(py_result[["event_vocab"]]),
-    n_events = py_result[["n_events"]]
+    event_vocab = event_vocab_for_iec,
+    event_names = names(event_vocab_for_iec),
+    n_events = n_events
   ))
 }
 
