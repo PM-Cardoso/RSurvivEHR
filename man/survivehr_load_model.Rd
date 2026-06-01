@@ -13,8 +13,7 @@ survivehr_load_model(path)
 \value{
 A named list (model bundle) with elements \code{model},
 \code{event_vocab}, \code{inv_vocab}, \code{config}, \code{time_scale},
-\code{value_standardization}, \code{token_policy},
-\code{history}, and \code{device}.
+\code{value_standardization}, \code{token_policy}, \code{history}, and \code{device}.
 }
 \description{
 Restores a model bundle previously saved with \code{survivehr_save_model()}.
