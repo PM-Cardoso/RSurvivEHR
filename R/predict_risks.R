@@ -96,7 +96,7 @@ survivehr_predict_event_risks <- function(
   return(list(
     risk_scores = risk_scores,
     patient_ids = patient_ids,
-    event_vocab = names(py_result[["event_vocab"]]),
+    event_vocab = reticulate::py_to_r(py_result[["event_vocab"]]),
     n_events = py_result[["n_events"]]
   ))
 }
