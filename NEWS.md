@@ -1,3 +1,31 @@
+# RSurvivEHR 0.9.3
+
+### New feature: Inter-Event Concordance (IEC) metric for evaluating competing-risk predictions
+
+Three new functions enable evaluation of how well model risk scores rank next events:
+
+- `survivehr_compute_iec()`: Pure metric calculation from pre-computed risk scores
+  and observed events. Returns overall IEC and optional per-event stratification.
+- `survivehr_predict_event_risks()`: Debug utility to extract full risk score matrices
+  from pretrain models for inspection or custom analysis.
+- `survivehr_evaluate_iec()`: End-to-end production workflow combining model inference,
+  risk score extraction, and IEC computation with batch-wise aggregation for memory efficiency.
+
+IEC (Inter-Event Concordance) is a ranking-based metric that measures how well predicted
+risk scores order competing next events:
+  - IEC ≈ 1.0: true event ranked among highest-risk (good prediction)
+  - IEC ≈ 0.5: true event ranked in middle of risk distribution
+  - IEC ≈ 0.0: true event ranked among lowest-risk (poor prediction)
+
+Implementation extracted from original SurvivEHR causal_eval.py module.
+Comprehensive unit tests (28 tests) validate core metric calculations.
+
+**New files:** `inst/python/iec_metrics.py`, `inst/python/test_iec_metrics.py`,
+`R/metrics_iec.R`, `R/predict_risks.R`, `R/evaluate_iec.R`, `tests/testthat/test-metrics_iec.R`
+
+**Changed files:** `inst/python/survivehr_backend.py` (added `extract_pretrain_risk_scores()`),
+`NAMESPACE` (new exports and S3 methods)
+
 # RSurvivEHR 0.9.2
 
 ### New feature: automatic per-event value standardisation across the full pipeline

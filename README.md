@@ -104,6 +104,7 @@ see the [Advanced topics](https://pm-cardoso.github.io/RSurvivEHR/articles/advan
 | **Leakage-free fine-tuning** | Context is restricted to events before the target age. |
 | **Flexible static covariates** | Any column names; any mix of categorical and numeric. |
 | **Continuous readings** | Record measurements (BP, HbA1c, BMI) in the `value` column. |
+| **Inter-Event Concordance (IEC) evaluation** | `survivehr_compute_iec()` + `survivehr_evaluate_iec()` measure how well risk scores rank competing events. |
 | **Save / load** | `survivehr_save_model()` / `survivehr_load_model()` preserve vocabulary, weights, and column schema. |
 | **HPC-friendly** | Compatible with Python ≥ 3.8 (no `match`/`case` syntax). |
 
@@ -115,6 +116,7 @@ Full documentation, vignettes, and configuration reference at
 **<a href="https://pm-cardoso.github.io/RSurvivEHR/" target="_blank" rel="noopener noreferrer">https://pm-cardoso.github.io/RSurvivEHR/</a>**
 
 - <a href="https://pm-cardoso.github.io/RSurvivEHR/articles/getting-started.html" target="_blank" rel="noopener noreferrer">Getting started</a> — step-by-step walkthrough of the full pipeline
+- <a href="https://pm-cardoso.github.io/RSurvivEHR/articles/iec-evaluation.html" target="_blank" rel="noopener noreferrer">Evaluating predictions with IEC</a> — ranking-based metric for competing-risk predictions
 - <a href="https://pm-cardoso.github.io/RSurvivEHR/articles/advanced-topics.html" target="_blank" rel="noopener noreferrer">Advanced topics</a> — token policy, age normalisation, static covariate encoding, FastEHR aliases, full worked example
 - <a href="https://pm-cardoso.github.io/RSurvivEHR/articles/model-architecture.html" target="_blank" rel="noopener noreferrer">Model architecture & parameter reference</a> — every `survivehr_config()` parameter with recommended values
 
