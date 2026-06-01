@@ -72,12 +72,8 @@ survivehr_evaluate_iec <- function(
     stop("events must be a data frame")
   }
 
-  # Extract observed events from transitions using model vocabulary
-  observed_events_list <- extract_observed_events(events, model$event_vocab)
-
-  if (length(observed_events_list$observed_events) == 0) {
-    stop("No transitions found in events data. Check input format.")
-  }
+  # Note: Observed events are extracted per batch using the vocabulary from risk extraction.
+  # This ensures proper alignment with the model's actual event mappings.
 
   # Split data by patient for batch processing
   unique_patients <- unique(events$patient_id)
@@ -91,6 +87,7 @@ survivehr_evaluate_iec <- function(
   all_errors <- character()
   by_event_aggregates <- list()
   batch_results <- list()
+  total_transitions <- 0  # Track actual transitions processed
 
   # Process batches
   for (batch_idx in 1:n_batches) {
@@ -112,16 +109,45 @@ survivehr_evaluate_iec <- function(
           max_patients = NULL
         )
 
-        # Get observed events for this batch
-        obs_batch <- extract_observed_events(events_batch, model$event_vocab)
+        # Flatten risk_scores (list of per-patient matrices) into single matrix
+        if (is.null(risks$risk_scores) || length(risks$risk_scores) == 0) {
+          stop("No risk scores returned from model prediction")
+        }
+        
+        risk_matrix <- do.call(rbind, risks$risk_scores)
+        
+        if (!is.matrix(risk_matrix) && !is.data.frame(risk_matrix)) {
+          stop(
+            "do.call(rbind, ...) failed to create matrix. ",
+            "Got class: ", paste(class(risk_matrix), collapse=", "),
+            ". risk_scores has ", length(risks$risk_scores), " elements. ",
+            "First element class: ", if(length(risks$risk_scores) > 0) 
+              paste(class(risks$risk_scores[[1]]), collapse=", ") else "N/A"
+          )
+        }
+
+        # Get observed events for this batch using the vocab from risk extraction
+        obs_batch <- extract_observed_events(events_batch, risks$event_vocab)
+
+        # Sanity check: dimensions must match
+        if (nrow(risk_matrix) != length(obs_batch$observed_events)) {
+          stop(
+            "Risk/observed transition mismatch in batch ", batch_idx, ": ",
+            "nrow(risk_matrix) = ", nrow(risk_matrix),
+            ", length(observed_events) = ", length(obs_batch$observed_events)
+          )
+        }
 
         # Compute IEC for this batch
         iec_batch <- survivehr_compute_iec(
-          risk_scores = risks$risk_matrix,
+          risk_scores = risk_matrix,
           observed_events = obs_batch$observed_events,
           stratify_by_event = stratify_by_event,
-          event_vocabulary = risks$event_vocab
+          event_vocabulary = risks$event_names
         )
+
+        # Track transitions processed
+        total_transitions <- total_transitions + length(obs_batch$observed_events)
 
         # Accumulate results
         all_iec_values <- c(all_iec_values, iec_batch$iec_values)
@@ -175,7 +201,7 @@ survivehr_evaluate_iec <- function(
   result <- list(
     mean_iec = if (length(all_iec_values) > 0) mean(all_iec_values, na.rm = TRUE) else 0,
     n_valid = length(all_iec_values),
-    n_total = length(observed_events_list$observed_events),
+    n_total = total_transitions,
     iec_values = if (aggregate_only) NULL else all_iec_values,
     observed_ranks = if (aggregate_only) NULL else all_observed_ranks,
     observed_ranks_from_top = if (aggregate_only) NULL else all_observed_ranks_from_top,
