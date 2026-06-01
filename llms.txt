@@ -111,6 +111,7 @@ article.
 | **Leakage-free fine-tuning** | Context is restricted to events before the target age. |
 | **Flexible static covariates** | Any column names; any mix of categorical and numeric. |
 | **Continuous readings** | Record measurements (BP, HbA1c, BMI) in the `value` column. |
+| **Inter-Event Concordance (IEC) evaluation** | `survivehr_compute_iec()` + `survivehr_evaluate_iec()` measure how well risk scores rank competing events. |
 | **Save / load** | [`survivehr_save_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.md) / [`survivehr_load_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_load_model.md) preserve vocabulary, weights, and column schema. |
 | **HPC-friendly** | Compatible with Python ≥ 3.8 (no `match`/`case` syntax). |
 
@@ -124,6 +125,9 @@ Full documentation, vignettes, and configuration reference at
 - [Getting
   started](https://pm-cardoso.github.io/RSurvivEHR/articles/getting-started.html)
   — step-by-step walkthrough of the full pipeline
+- [Evaluating predictions with
+  IEC](https://pm-cardoso.github.io/RSurvivEHR/articles/iec-evaluation.html)
+  — ranking-based metric for competing-risk predictions
 - [Advanced
   topics](https://pm-cardoso.github.io/RSurvivEHR/articles/advanced-topics.html)
   — token policy, age normalisation, static covariate encoding, FastEHR
@@ -202,5 +206,7 @@ Validate input data frames before passing to training functions.
   model](https://pm-cardoso.github.io/RSurvivEHR/articles/data-pipeline.md):
 - [Getting started with
   RSurvivEHR](https://pm-cardoso.github.io/RSurvivEHR/articles/getting-started.md):
+- [Evaluating predictions with Inter-Event Concordance
+  (IEC)](https://pm-cardoso.github.io/RSurvivEHR/articles/iec-evaluation.md):
 - [Model architecture and parameter
   reference](https://pm-cardoso.github.io/RSurvivEHR/articles/model-architecture.md):

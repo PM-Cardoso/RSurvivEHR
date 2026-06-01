@@ -5,8 +5,9 @@ articles:
   advanced-topics: advanced-topics.html
   data-pipeline: data-pipeline.html
   getting-started: getting-started.html
+  iec-evaluation: iec-evaluation.html
   model-architecture: model-architecture.html
-last_built: 2026-05-27T09:42Z
+last_built: 2026-06-01T14:09Z
 urls:
   reference: https://pm-cardoso.github.io/RSurvivEHR/reference
   article: https://pm-cardoso.github.io/RSurvivEHR/articles

@@ -1,0 +1,246 @@
+# Evaluating predictions with Inter-Event Concordance (IEC)
+
+After training a pretrain model with
+[`survivehr_pretrain()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_pretrain.md),
+you can evaluate how well the model’s risk scores rank competing next
+events using **Inter-Event Concordance (IEC)**.
+
+IEC measures the quality of predicted risk rankings for next-event
+prediction in competing-risk settings.
+
+------------------------------------------------------------------------
+
+## What is IEC?
+
+Inter-Event Concordance (IEC) is a ranking-based metric that answers:
+**How well does the model’s predicted risk score rank the true next
+event among all possible events?**
+
+For each transition in a patient’s history: 1. Rank all possible next
+events by their predicted risk (low → high) 2. Find the rank position of
+the true observed event 3. Normalize to \[0, 1\]
+
+**Interpretation:** - IEC ≈ **1.0**: True event ranked among
+highest-risk events (excellent prediction) - IEC ≈ **0.5**: True event
+ranked in middle of risk distribution (fair prediction) - IEC ≈ **0.0**:
+True event ranked among lowest-risk events (poor prediction)
+
+------------------------------------------------------------------------
+
+## Three evaluation functions
+
+### 1. `survivehr_compute_iec()`: Pure metric calculation
+
+Use this for **post-hoc analysis** of pre-computed risk scores:
+
+``` r
+
+library(RSurvivEHR)
+
+# Assume you have:
+# - risk_matrix: shape (n_transitions, n_events)
+# - observed_events: vector of 1-indexed event IDs (same length as nrow(risk_matrix))
+
+# Basic IEC
+result <- survivehr_compute_iec(
+  risk_scores = risk_matrix,
+  observed_events = observed_events
+)
+print(result)
+
+# With stratification by event type
+result <- survivehr_compute_iec(
+  risk_scores = risk_matrix,
+  observed_events = observed_events,
+  stratify_by_event = TRUE,
+  event_vocabulary = c("HTN", "DM", "MI", "CKD")
+)
+print(result)
+```
+
+**Output:** - `mean_iec`: Overall IEC across all transitions -
+`n_valid`: Number of successfully computed transitions - `iec_values`:
+Per-transition IEC scores - `by_event`: (if stratified) Per-event IEC
+breakdown
+
+------------------------------------------------------------------------
+
+### 2. `survivehr_predict_event_risks()`: Extract risk scores
+
+Use this **debug function** to inspect the model’s raw risk score
+matrix:
+
+``` r
+
+# Extract risk scores for a cohort
+risks <- survivehr_predict_event_risks(
+  model = pretrain_model,
+  events = test_events,
+  static = test_static,
+  max_patients = NULL
+)
+
+# Output structure:
+# risks$risk_matrix: shape (n_transitions, n_events)
+# risks$patient_ids: IDs of patients included
+# risks$event_vocab: Event vocabulary used by model
+# risks$n_events: Total number of events
+```
+
+This is useful for: - Debugging model predictions - Custom downstream
+analysis - Understanding which events the model scores highest/lowest
+
+------------------------------------------------------------------------
+
+### 3. `survivehr_evaluate_iec()`: End-to-end evaluation
+
+Use this for **production workflows**. It combines extraction +
+computation with batch processing:
+
+``` r
+
+# End-to-end IEC evaluation with stratification
+iec_eval <- survivehr_evaluate_iec(
+  model = pretrain_model,
+  events = test_events,
+  static = test_static,
+  batch_size = 32,
+  stratify_by_event = TRUE,
+  aggregate_only = TRUE
+)
+
+print(iec_eval)
+```
+
+**Features:** - Automatically extracts risk scores in batches (memory
+efficient) - Computes IEC per batch and aggregates - Returns stratified
+results by event type - Handles missing events gracefully
+
+------------------------------------------------------------------------
+
+## Complete example workflow
+
+``` r
+
+library(RSurvivEHR)
+
+# 1. Setup and load data
+survivehr_setup()
+
+# Create example data (from data-pipeline vignette)
+events_df <- # ... your event data
+static_df <- # ... your static covariates
+
+# 2. Train pretrain model
+cfg <- survivehr_config(
+  block_size = 128,
+  n_layer = 4,
+  n_head = 8,
+  n_embd = 256,
+  epochs = 10
+)
+
+pretrain_model <- survivehr_pretrain(
+  events = events_df,
+  static_covariates = static_df,
+  config = cfg
+)
+
+# 3. Prepare evaluation set (next-event prediction dataset)
+# Select transitions where we have ≥2 observed events per patient
+validation_data <- events_df %>%
+  arrange(patient_id, age) %>%
+  group_by(patient_id) %>%
+  mutate(
+    event_num = row_number(),
+    n_events = n()
+  ) %>%
+  ungroup() %>%
+  filter(n_events >= 2)
+
+# Context: all events except the last for each patient
+test_context <- validation_data %>%
+  group_by(patient_id) %>%
+  filter(event_num < max(event_num)) %>%
+  ungroup() %>%
+  select(patient_id, event, age, value)
+
+# Targets: the last event for each patient
+test_targets <- validation_data %>%
+  group_by(patient_id) %>%
+  filter(event_num == max(event_num)) %>%
+  ungroup() %>%
+  select(patient_id, true_next_event = event)
+
+# Static for evaluation set
+test_static <- static_df %>%
+  semi_join(test_targets, by = "patient_id")
+
+# 4. Evaluate IEC
+iec_result <- survivehr_evaluate_iec(
+  model = pretrain_model,
+  events = test_context,
+  static = test_static,
+  batch_size = 32,
+  stratify_by_event = TRUE,
+  aggregate_only = TRUE
+)
+
+# 5. Interpret results
+cat("\n=== IEC Evaluation Results ===\n")
+cat("Overall IEC:     ", sprintf("%.4f", iec_result$mean_iec), "\n")
+cat("Valid transitions:", iec_result$n_valid, "/", iec_result$n_total, "\n")
+cat("\nIEC by Event Type:\n")
+print(iec_result$by_event)
+```
+
+------------------------------------------------------------------------
+
+## Interpreting stratified results
+
+Stratification reveals if the model performs differently on common
+vs. rare events:
+
+``` r
+
+# Example stratified output:
+#     event mean_iec n_obs
+#   1   HTN   0.725  1500    (common: lower IEC acceptable)
+#   2    DM   0.680  1200    (common: slightly lower)
+#   3    MI   0.821    45    (rare: higher IEC indicates good ranking)
+#   4   CKD   0.605    32    (rare: lower IEC, harder to predict)
+```
+
+**Key insights:** - If rare events have lower IEC, the model may
+struggle with limited training examples - If common events have lower
+IEC, the model may be overconfident in common outcomes - Disparities
+reveal potential for targeted fine-tuning or reweighting
+
+------------------------------------------------------------------------
+
+## Best practices
+
+1.  **Always use a separate validation set** to avoid overfitting
+    assessment
+2.  **Check both overall and stratified IEC** to identify event-specific
+    patterns
+3.  **Compare across model configurations** (layers, heads, learning
+    rate) to find the best architecture
+4.  **Use `aggregate_only=FALSE`** in `survivehr_evaluate_iec()` if you
+    need per-transition scores for visualization
+5.  **Monitor IEC during fine-tuning** to track downstream task
+    performance
+
+------------------------------------------------------------------------
+
+## See also
+
+- [Data
+  pipeline](https://pm-cardoso.github.io/RSurvivEHR/articles/data-pipeline.md):
+  Preparing input data
+- [Getting
+  started](https://pm-cardoso.github.io/RSurvivEHR/articles/getting-started.md):
+  Model training workflow
+- [Advanced
+  topics](https://pm-cardoso.github.io/RSurvivEHR/articles/advanced-topics.md):
+  Custom workflows and troubleshooting

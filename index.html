@@ -29,7 +29,7 @@
 
     <a class="navbar-brand me-2" href="index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -197,6 +197,11 @@ new events ────────▶ survivehr_predict()  ──▶ per-patien
 <td>Record measurements (BP, HbA1c, BMI) in the <code>value</code> column.</td>
 </tr>
 <tr>
+<td><strong>Inter-Event Concordance (IEC) evaluation</strong></td>
+<td>
+<code>survivehr_compute_iec()</code> + <code>survivehr_evaluate_iec()</code> measure how well risk scores rank competing events.</td>
+</tr>
+<tr>
 <td><strong>Save / load</strong></td>
 <td>
 <code><a href="reference/survivehr_save_model.html">survivehr_save_model()</a></code> / <code><a href="reference/survivehr_load_model.html">survivehr_load_model()</a></code> preserve vocabulary, weights, and column schema.</td>
@@ -216,6 +221,8 @@ new events ────────▶ survivehr_predict()  ──▶ per-patien
 <ul>
 <li>
 <a href="https://pm-cardoso.github.io/RSurvivEHR/articles/getting-started.html" target="_blank" rel="noopener noreferrer">Getting started</a> — step-by-step walkthrough of the full pipeline</li>
+<li>
+<a href="https://pm-cardoso.github.io/RSurvivEHR/articles/iec-evaluation.html" target="_blank" rel="noopener noreferrer">Evaluating predictions with IEC</a> — ranking-based metric for competing-risk predictions</li>
 <li>
 <a href="https://pm-cardoso.github.io/RSurvivEHR/articles/advanced-topics.html" target="_blank" rel="noopener noreferrer">Advanced topics</a> — token policy, age normalisation, static covariate encoding, FastEHR aliases, full worked example</li>
 <li>

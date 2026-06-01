@@ -8,5 +8,7 @@
   model](https://pm-cardoso.github.io/RSurvivEHR/articles/data-pipeline.md):
 - [Getting started with
   RSurvivEHR](https://pm-cardoso.github.io/RSurvivEHR/articles/getting-started.md):
+- [Evaluating predictions with Inter-Event Concordance
+  (IEC)](https://pm-cardoso.github.io/RSurvivEHR/articles/iec-evaluation.md):
 - [Model architecture and parameter
   reference](https://pm-cardoso.github.io/RSurvivEHR/articles/model-architecture.md):
