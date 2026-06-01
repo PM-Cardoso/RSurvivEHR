@@ -1327,17 +1327,7 @@ def extract_pretrain_risk_scores(model_bundle: Dict[str, Any],
         reference_static_encoded_cols=model_bundle.get("static_col_names", None)
     )
     
-    # Debug: check built data structure
-    print(f"\n[IEC DEBUG] Built data:", flush=True)
-    print(f"  n_patients: {len(built.patient_ids)}", flush=True)
-    print(f"  tokens shape: {len(built.tokens)}", flush=True)
-    print(f"  attention_mask length: {len(built.attention_mask)}", flush=True)
-    if built.attention_mask is not None and len(built.attention_mask) > 0:
-        try:
-            att_sums = [int(sum(mask)) if isinstance(mask, list) else int(mask.sum()) for mask in built.attention_mask[:min(5, len(built.attention_mask))]]
-            print(f"  attention_mask sums (first 5): {att_sums}", flush=True)
-        except Exception as e:
-            print(f"  (could not compute attention_mask sums: {e})", flush=True)
+    # Built data structure confirmed (production: debug output removed)
     
     device = next(model.parameters()).device
     
@@ -1387,31 +1377,14 @@ def extract_pretrain_risk_scores(model_bundle: Dict[str, Any],
         patient_ids_list = []
         
         # Debug: check forward pass output
-        print(f"\n[IEC DEBUG] Forward pass outputs:", flush=True)
-        print(f"  batch tokens shape: {tokens.shape}", flush=True)
-        print(f"  batch attention_mask shape: {attention_mask.shape}, dtype: {attention_mask.dtype}", flush=True)
-        print(f"  n_events (vocab): {n_events}", flush=True)
-        print(f"  n_patients: {len(built.patient_ids)}", flush=True)
-        try:
-            att_sums = [int(attention_mask[j].sum().item()) if hasattr(attention_mask[j].sum(), 'item') else int(attention_mask[j].sum()) for j in range(min(5, len(attention_mask)))]
-            print(f"  First 5 attention_mask sums: {att_sums}", flush=True)
-        except Exception as e:
-            print(f"  (could not compute attention_mask sums: {e})", flush=True)
-        if cdfs_all is not None and len(cdfs_all) > 0:
-            print(f"  First CDF shape: {cdfs_all[0].shape}", flush=True)
-            print(f"  First CDF dtype: {cdfs_all[0].dtype}", flush=True)
-            print(f"  CDFs list length: {len(cdfs_all)}", flush=True)
+        # Forward pass complete (production: debug output removed)
         
-        print(f"\n[IEC DEBUG] Extracting risk scores for {len(built.patient_ids)} patients:", flush=True)
         for i, pid in enumerate(built.patient_ids):
             # Get number of valid transitions for this patient
             mask_sum = attention_mask[i].sum().item() if hasattr(attention_mask[i].sum(), 'item') else int(attention_mask[i].sum())
             n_transitions_i = int(mask_sum) - 1
             
-            print(f"  Patient {i} (id={pid}): mask_sum={mask_sum}, n_transitions={n_transitions_i}", flush=True)
-            
             if n_transitions_i <= 0:
-                print(f"    -> Skipping (n_transitions <= 0)", flush=True)
                 continue
             
             # Extract CDFs for all events at all positions for this patient
@@ -1424,11 +1397,8 @@ def extract_pretrain_risk_scores(model_bundle: Dict[str, Any],
                     # Sum CDF across time grid to get integrated risk
                     risk_scores_matrix[t, event_idx] = float(np.sum(cdf[i, :]))
             
-            print(f"    -> Appended risk matrix shape: {risk_scores_matrix.shape}", flush=True)
             risk_scores_by_patient.append(risk_scores_matrix)
             patient_ids_list.append(pid)
-        
-        print(f"\n[IEC DEBUG] Total risk matrices appended: {len(risk_scores_by_patient)}", flush=True)
     
     # Build explicit vocabulary table for R as pandas DataFrame
     # CDF/risk columns correspond to event_ids 1..n_events (excludes <PAD> at 0)
@@ -1448,9 +1418,6 @@ def extract_pretrain_risk_scores(model_bundle: Dict[str, Any],
             })
     
     event_vocab_table = pd.DataFrame(iec_vocab_records)
-    
-    print(f"[IEC DEBUG] Built event_vocab_table with {len(iec_vocab_records)} events:", flush=True)
-    print(event_vocab_table.to_string(index=False), flush=True)
     
     return {
         "risk_scores": risk_scores_by_patient,
