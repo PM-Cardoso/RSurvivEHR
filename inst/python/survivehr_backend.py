@@ -1337,22 +1337,21 @@ def extract_pretrain_risk_scores(model_bundle: Dict[str, Any],
     
     model.eval()
     with torch.no_grad():
-        base_model = model.model if hasattr(model, "model") else model
-        
-        # Forward pass without generation to get model outputs (including CDFs)
-        # We'll wrap this in the same batch format as the model expects
         batch = {
             "tokens": tokens,
             "ages": ages,
             "values": values,
             "attention_mask": attention_mask,
             "static_covariates": static_cov,
-            "target_token": torch.zeros(tokens.shape[0], dtype=torch.long, device=device),
-            "target_age_delta": torch.zeros(tokens.shape[0], dtype=torch.float32, device=device),
-            "target_value": torch.full((tokens.shape[0],), torch.nan, dtype=torch.float32, device=device),
         }
-        
-        outputs, _, _ = base_model(batch, is_generation=False, return_loss=False, return_generation=True)
+
+        # Call full CausalExperiment wrapper to get survival outputs
+        outputs, _, _ = model(
+            batch,
+            is_generation=False,
+            return_loss=False,
+            return_generation=True
+        )
         
         if "surv" not in outputs:
             raise ValueError("Model output does not contain 'surv' key. Check model forward pass.")
