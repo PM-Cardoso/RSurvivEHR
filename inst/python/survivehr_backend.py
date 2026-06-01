@@ -1332,7 +1332,7 @@ def extract_pretrain_risk_scores(model_bundle: Dict[str, Any],
     tokens = torch.tensor(built.tokens, dtype=torch.long, device=device)
     ages = torch.tensor(built.ages, dtype=torch.float32, device=device)
     values = torch.tensor(built.values, dtype=torch.float32, device=device)
-    attention_mask = torch.tensor(built.attention_mask, dtype=torch.float32, device=device)
+    attention_mask = torch.tensor(built.attention_mask, dtype=torch.bool, device=device)
     static_cov = torch.tensor(built.static_covariates, dtype=torch.float32, device=device)
     
     model.eval()
