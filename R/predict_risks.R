@@ -73,7 +73,8 @@ survivehr_predict_event_risks <- function(
   )
 
   # Combine risk scores from all patients into single matrix
-  risk_scores <- reticulate::py_to_r(py_result$risk_scores)
+  # Use [[ ]] to access Python dict keys, not $ (which tries attributes)
+  risk_scores <- reticulate::py_to_r(py_result[["risk_scores"]])
   
   if (is.null(risk_scores) || length(risk_scores) == 0) {
     stop(
@@ -87,7 +88,7 @@ survivehr_predict_event_risks <- function(
   risk_matrix <- do.call(rbind, risk_scores)
   
   # Properly repeat patient IDs: one ID per row of risk matrix
-  patient_ids_py <- reticulate::py_to_r(py_result$patient_ids)
+  patient_ids_py <- reticulate::py_to_r(py_result[["patient_ids"]])
   patient_ids <- unlist(Map(
     function(pid, mat) rep(pid, nrow(mat)),
     patient_ids_py,
@@ -97,8 +98,8 @@ survivehr_predict_event_risks <- function(
   return(list(
     risk_matrix = risk_matrix,
     patient_ids = patient_ids,
-    event_vocab = names(py_result$event_vocab),
-    n_events = py_result$n_events
+    event_vocab = names(py_result[["event_vocab"]]),
+    n_events = py_result[["n_events"]]
   ))
 }
 
