@@ -82,12 +82,12 @@ survivehr_evaluate_iec <- function(
 
   # Initialize aggregation
   all_iec_values <- numeric()
+  all_observed_events <- integer()  # Track all observed events for final count
   all_observed_ranks <- integer()
   all_observed_ranks_from_top <- integer()
   all_errors <- character()
   by_event_aggregates <- list()
   batch_results <- list()
-  total_transitions <- 0  # Track actual transitions processed
 
   # Process batches
   for (batch_idx in 1:n_batches) {
@@ -146,11 +146,9 @@ survivehr_evaluate_iec <- function(
           event_vocabulary = risks$event_names
         )
 
-        # Track transitions processed
-        total_transitions <- total_transitions + length(obs_batch$observed_events)
-
-        # Accumulate results
+        # Accumulate IEC values and observed events
         all_iec_values <- c(all_iec_values, iec_batch$iec_values)
+        all_observed_events <- c(all_observed_events, obs_batch$observed_events)
         all_observed_ranks <- c(all_observed_ranks, iec_batch$observed_ranks)
         all_observed_ranks_from_top <- c(all_observed_ranks_from_top, iec_batch$observed_ranks_from_top)
         all_errors <- c(all_errors, iec_batch$errors)
@@ -198,10 +196,12 @@ survivehr_evaluate_iec <- function(
   }
 
   # Create result object
+  # n_valid = count of non-NA IEC values
+  # n_total = total transitions processed (from observed_events)
   result <- list(
     mean_iec = if (length(all_iec_values) > 0) mean(all_iec_values, na.rm = TRUE) else 0,
-    n_valid = length(all_iec_values),
-    n_total = total_transitions,
+    n_valid = sum(!is.na(all_iec_values)),
+    n_total = length(all_observed_events),
     iec_values = if (aggregate_only) NULL else all_iec_values,
     observed_ranks = if (aggregate_only) NULL else all_observed_ranks,
     observed_ranks_from_top = if (aggregate_only) NULL else all_observed_ranks_from_top,
