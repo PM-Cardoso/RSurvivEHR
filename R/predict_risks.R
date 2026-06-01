@@ -85,9 +85,7 @@ survivehr_predict_event_risks <- function(
     )
   }
 
-  risk_matrix <- do.call(rbind, risk_scores)
-  
-  # Properly repeat patient IDs: one ID per row of risk matrix
+  # Properly repeat patient IDs: one ID per row of risk matrix per patient
   patient_ids_py <- reticulate::py_to_r(py_result[["patient_ids"]])
   patient_ids <- unlist(Map(
     function(pid, mat) rep(pid, nrow(mat)),
@@ -96,7 +94,7 @@ survivehr_predict_event_risks <- function(
   ))
 
   return(list(
-    risk_matrix = risk_matrix,
+    risk_scores = risk_scores,
     patient_ids = patient_ids,
     event_vocab = names(py_result[["event_vocab"]]),
     n_events = py_result[["n_events"]]
