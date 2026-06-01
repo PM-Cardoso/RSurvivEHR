@@ -93,18 +93,21 @@ survivehr_predict_event_risks <- function(
     risk_scores
   ))
 
-  # Build event vocabulary mapping for IEC using the explicit vocab table
-  # This avoids fragile dict conversion and ensures event names are preserved
-  vocab_table <- as.data.frame(
-    reticulate::py_to_r(py_result[["event_vocab_table"]]),
-    stringsAsFactors = FALSE
-  )
-  
+  # Extract vocab table returned from Python (now a pandas DataFrame)
+  vocab_table <- reticulate::py_to_r(py_result[["event_vocab_table"]])
   vocab_table$event_id <- as.integer(vocab_table$event_id)
   vocab_table <- vocab_table[order(vocab_table$event_id), ]
   
+  # Sanity check: vocab must match risk matrix columns
+  if (nrow(vocab_table) != ncol(do.call(rbind, risk_scores))) {
+    stop(
+      "Vocabulary/risk matrix mismatch: vocab_table has ", nrow(vocab_table),
+      " rows but risk_matrix has ", ncol(do.call(rbind, risk_scores)), " columns."
+    )
+  }
+  
   # Create named vector: event_name -> event_id (for IEC)
-  event_names <- vocab_table$event
+  event_names <- as.character(vocab_table$event)
   event_vocab_for_iec <- setNames(vocab_table$event_id, vocab_table$event)
 
   return(list(
@@ -113,7 +116,7 @@ survivehr_predict_event_risks <- function(
     event_vocab = event_vocab_for_iec,
     event_names = event_names,
     event_vocab_table = vocab_table,
-    n_events = py_result[["n_events"]]
+    n_events = as.integer(py_result[["n_events"]])
   ))
 }
 

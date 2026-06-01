@@ -1430,25 +1430,33 @@ def extract_pretrain_risk_scores(model_bundle: Dict[str, Any],
         
         print(f"\n[IEC DEBUG] Total risk matrices appended: {len(risk_scores_by_patient)}", flush=True)
     
-    # Build explicit vocabulary table for R
-    # Only include events with token IDs 1..n_events (exclude <PAD> at 0)
-    vocab_records = []
-    for event_name, token_id in event_vocab.items():
-        token_id = int(token_id)
-        if token_id >= 1 and token_id <= n_events:
-            vocab_records.append({
-                "event": str(event_name),
-                "event_id": token_id
+    # Build explicit vocabulary table for R as pandas DataFrame
+    # CDF/risk columns correspond to event_ids 1..n_events (excludes <PAD> at 0)
+    # Iterate by event_id to ensure we get all events in order
+    import pandas as pd
+    
+    # Create inverse vocab: token_id -> event_name
+    inv_vocab = {int(v): str(k) for k, v in event_vocab.items()}
+    
+    iec_vocab_records = []
+    for event_id in range(1, n_events + 1):
+        event_name = inv_vocab.get(event_id, None)
+        if event_name is not None:
+            iec_vocab_records.append({
+                "event": event_name,
+                "event_id": int(event_id)
             })
     
-    vocab_records = sorted(vocab_records, key=lambda x: x["event_id"])
+    event_vocab_table = pd.DataFrame(iec_vocab_records)
+    
+    print(f"[IEC DEBUG] Built event_vocab_table with {len(iec_vocab_records)} events:", flush=True)
+    print(event_vocab_table.to_string(index=False), flush=True)
     
     return {
         "risk_scores": risk_scores_by_patient,
         "patient_ids": patient_ids_list,
-        "event_vocab": event_vocab,
-        "event_vocab_table": vocab_records,
-        "n_events": n_events,
+        "event_vocab_table": event_vocab_table,
+        "n_events": int(n_events),
     }
 
 def save_model_bundle(model_bundle: Dict[str, Any], path: str) -> None:
