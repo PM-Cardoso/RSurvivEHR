@@ -73,17 +73,25 @@ survivehr_predict_event_risks <- function(
   )
 
   # Combine risk scores from all patients into single matrix
-  if (length(py_result$risk_scores) == 0) {
-    stop("No risk scores extracted. Check that model and events are valid.")
+  risk_scores <- reticulate::py_to_r(py_result$risk_scores)
+  
+  if (is.null(risk_scores) || length(risk_scores) == 0) {
+    stop(
+      "extract_pretrain_risk_scores() returned empty risk_scores list. \n",
+      "Check Python debug output above for why patients were skipped. \n",
+      "This usually means the model's CDF outputs are not in the expected shape.\n",
+      "CDFs should be shaped: (n_patients, n_time_grid) for each event type."
+    )
   }
 
-  risk_matrix <- do.call(rbind, py_result$risk_scores)
+  risk_matrix <- do.call(rbind, risk_scores)
   
   # Properly repeat patient IDs: one ID per row of risk matrix
+  patient_ids_py <- reticulate::py_to_r(py_result$patient_ids)
   patient_ids <- unlist(Map(
     function(pid, mat) rep(pid, nrow(mat)),
-    py_result$patient_ids,
-    py_result$risk_scores
+    patient_ids_py,
+    risk_scores
   ))
 
   return(list(
