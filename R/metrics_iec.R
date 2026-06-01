@@ -6,7 +6,7 @@
 #'
 #' This implements the ranking-based concordance calculation from the original SurvivEHR
 #' model: for each transition, ranks all possible next events by their predicted risk,
-#' finds the rank position of the true observed event, and normalizes to [0,1].
+#' finds the rank position of the true observed event, and normalizes to 0,1.
 #'
 #' @param risk_scores Matrix of shape (n_transitions, n_events) where each row contains
 #'   risk scores for all possible events at that transition. Can also be a data.frame.
