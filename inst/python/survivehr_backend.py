@@ -39,6 +39,27 @@ from SurvivEHR.experiments import CausalExperiment, FineTuneExperiment
 from iec_metrics import compute_iec_single, compute_iec_batch, compute_iec_stratified
 
 
+def _as_list_or_none(x):
+    """Normalise reticulate/Python round-trip values to list or None.
+    
+    When R data.frames are passed through reticulate to Python and then
+    back to R, column names may arrive as strings instead of lists.
+    This normalises them back to proper lists.
+    """
+    if x is None:
+        return None
+    if isinstance(x, str):
+        return [x]
+    if isinstance(x, tuple):
+        return list(x)
+    if isinstance(x, list):
+        return x
+    try:
+        return list(x)
+    except TypeError:
+        return [x]
+
+
 def _device_from_config(config: Dict[str, Any]) -> torch.device:
     choice = str(config.get("device", "auto")).lower()
     if choice == "cuda" and torch.cuda.is_available():
@@ -100,6 +121,10 @@ def _encode_static(
         behaviour — a category not present in a small prediction batch simply
         has no patients with that value.
     """
+    # Normalise reticulate round-trip artefacts: single strings -> lists
+    reference_raw_cols = _as_list_or_none(reference_raw_cols)
+    reference_encoded_cols = _as_list_or_none(reference_encoded_cols)
+
     n = len(patient_ids)
 
     if static_df is None:
@@ -1377,6 +1402,10 @@ def save_model_bundle(model_bundle: Dict[str, Any], path: str) -> None:
     elif _outcomes is not None:
         _outcomes = list(_outcomes)
 
+    # Normalise static columns: reticulate may have converted lists -> strings
+    _static_raw_cols = _as_list_or_none(model_bundle.get("static_raw_cols", None))
+    _static_col_names = _as_list_or_none(model_bundle.get("static_col_names", None))
+
     payload = {
         "type": model_bundle["type"],
         "state_dict": model_bundle["model"].state_dict(),
@@ -1390,8 +1419,8 @@ def save_model_bundle(model_bundle: Dict[str, Any], path: str) -> None:
         "outcomes": _outcomes,
         "risk_model": model_bundle.get("risk_model", "competing-risk"),
         "token_policy": model_bundle.get("token_policy", _token_policy_from_config()),
-        "static_raw_cols": model_bundle.get("static_raw_cols", None),
-        "static_col_names": model_bundle.get("static_col_names", None),
+        "static_raw_cols": _static_raw_cols,
+        "static_col_names": _static_col_names,
         "training_duration_secs": model_bundle.get("training_duration_secs", None),
         "device": model_bundle.get("device", "cpu"),
     }
@@ -1434,8 +1463,8 @@ def load_model_bundle(path: str) -> Dict[str, Any]:
         "outcomes": outcomes if kind == "finetune" else payload.get("outcomes", None),
         "risk_model": payload.get("risk_model", "competing-risk"),
         "token_policy": payload.get("token_policy", _token_policy_from_config()),
-        "static_raw_cols": payload.get("static_raw_cols", None),
-        "static_col_names": payload.get("static_col_names", None),
+        "static_raw_cols": _as_list_or_none(payload.get("static_raw_cols", None)),
+        "static_col_names": _as_list_or_none(payload.get("static_col_names", None)),
         "training_duration_secs": payload.get("training_duration_secs", None),
         "device": payload.get("device", "cpu"),
     }
