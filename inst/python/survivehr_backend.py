@@ -1412,8 +1412,31 @@ def extract_pretrain_risk_scores(
         raise ValueError("Model survival output does not contain observed event IDs: outputs['surv']['k'].")
 
     k_all = outputs["surv"]["k"]
+
+    # Convert observed event IDs safely to a flat NumPy integer array.
+    # outputs["surv"]["k"] may be:
+    #   - a torch.Tensor
+    #   - a list/tuple of torch.Tensors
+    #   - already a numpy array/list
     if isinstance(k_all, torch.Tensor):
         k_all = k_all.detach().cpu().numpy()
+
+    elif isinstance(k_all, (list, tuple)):
+        converted = []
+
+        for x in k_all:
+            if isinstance(x, torch.Tensor):
+                x = x.detach().cpu().numpy()
+            else:
+                x = np.asarray(x)
+
+            converted.append(np.asarray(x).reshape(-1))
+
+        if len(converted) == 0:
+            k_all = np.array([], dtype=np.int64)
+        else:
+            k_all = np.concatenate(converted)
+
     else:
         k_all = np.asarray(k_all)
 
