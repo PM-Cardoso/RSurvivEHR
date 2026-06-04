@@ -1271,51 +1271,63 @@ def predict_next_events(model_bundle: Dict[str, Any],
 
     return pd.DataFrame(rows)
 
+def extract_pretrain_risk_scores(
+    model_bundle: Dict[str, Any],
+    events_df: pd.DataFrame,
+    static_df: Optional[pd.DataFrame] = None
+) -> Dict[str, Any]:
+    """Extract risk scores and observed next-event IDs for IEC evaluation.
 
-def extract_pretrain_risk_scores(model_bundle: Dict[str, Any],
-                                 events_df: pd.DataFrame,
-                                 static_df: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
-    """Extract risk scores for all event types at each transition (pretrain model only).
-    
-    For the pretrain model, this performs a forward pass (without sampling) to extract
-    the model's predicted risk for each possible next event at each transition.
-    
-    Returns per-transition risk scores: [sum(cdf) for cdf in outputs["surv"]["surv_CDF"]]
-    which approximates the integrated cumulative risk for each outcome.
-    
-    Args:
-        model_bundle: Pretrained model bundle with keys: model, event_vocab, etc.
-        events_df: Events data frame with patient event history.
-        static_df: Optional static covariates.
-    
-    Returns:
-        Dictionary with:
-            - "risk_scores": List of 2D numpy arrays, one per patient.
-              Each array has shape (n_transitions, n_events) where n_transitions
-              is the number of observed transitions for that patient.
-            - "patient_ids": List of patient IDs in the same order as risk_scores.
-            - "event_vocab": Dict mapping event ID to name.
-            - "n_events": Integer, total number of event types (vocabulary size).
-    
-    Raises:
-        ValueError: If model_bundle is not pretrain type.
+    This function is for pretrain models only. It performs a forward pass through
+    the full CausalExperiment wrapper and extracts, for each valid transition:
+
+      1. risk scores for every possible next event
+      2. the observed true next-event ID used by the model
+
+    Returning the observed event IDs from Python avoids R/Python mismatch caused by
+    reconstructing observed transitions separately from the raw event table.
+
+    Returns
+    -------
+    dict
+        risk_scores:
+            List of 2D numpy arrays, one per patient.
+            Each matrix has shape (n_transitions_i, n_events).
+
+        observed_events:
+            List of 1D numpy arrays, one per patient.
+            Each vector has length n_transitions_i and contains the observed
+            true next-event IDs for those risk-score rows.
+
+        patient_ids:
+            List of patient IDs corresponding to risk_scores/observed_events.
+
+        event_vocab_table:
+            pandas DataFrame with columns event and event_id. event_id is the
+            1-indexed ID corresponding to the risk matrix columns.
+
+        n_events:
+            Number of predictable event types.
     """
+
     if model_bundle.get("type") != "pretrain":
         raise ValueError(
-            f"extract_pretrain_risk_scores() only supports pretrain models, "
+            "extract_pretrain_risk_scores() only supports pretrain models, "
             f"got type={model_bundle.get('type')}"
         )
-    
+
     model = model_bundle["model"]
     event_vocab = dict(model_bundle["event_vocab"])
-    inv_vocab = {int(k): v for k, v in dict(model_bundle["inv_vocab"]).items()}
+
     value_standardization = _normalise_value_standardization(
         model_bundle.get("value_standardization", None)
     )
-    
+
     block_size = int(model_bundle["block_size"])
+
     events_clean = _clean_events(events_df)
     events_std = _standardize_events_df(events_clean, value_standardization)
+
     built = _build_context_data(
         events_df=events_std,
         static_df=static_df,
@@ -1326,18 +1338,24 @@ def extract_pretrain_risk_scores(model_bundle: Dict[str, Any],
         reference_static_cols=model_bundle.get("static_raw_cols", None),
         reference_static_encoded_cols=model_bundle.get("static_col_names", None)
     )
-    
-    # Built data structure confirmed (production: debug output removed)
-    
+
     device = next(model.parameters()).device
-    
+
     tokens = torch.tensor(built.tokens, dtype=torch.long, device=device)
     ages = torch.tensor(built.ages, dtype=torch.float32, device=device)
     values = torch.tensor(built.values, dtype=torch.float32, device=device)
     attention_mask = torch.tensor(built.attention_mask, dtype=torch.bool, device=device)
     static_cov = torch.tensor(built.static_covariates, dtype=torch.float32, device=device)
-    
+
+    # Number of valid next-event transitions in the exact model input.
+    transition_counts = [
+        max(int(np.sum(mask)) - 1, 0)
+        for mask in built.attention_mask
+    ]
+    expected_total_transitions = int(sum(transition_counts))
+
     model.eval()
+
     with torch.no_grad():
         batch = {
             "tokens": tokens,
@@ -1347,117 +1365,152 @@ def extract_pretrain_risk_scores(model_bundle: Dict[str, Any],
             "static_covariates": static_cov,
         }
 
-        # Call full CausalExperiment wrapper to get survival outputs
+        # Use the full CausalExperiment wrapper, not model.model.
         outputs, _, _ = model(
             batch,
             is_generation=False,
             return_loss=False,
             return_generation=True
         )
-        
-        if "surv" not in outputs:
-            raise ValueError("Model output does not contain 'surv' key. Check model forward pass.")
-        
-        cdfs_all = outputs["surv"]["surv_CDF"]
-        if not cdfs_all or len(cdfs_all) == 0:
-            raise ValueError("No CDFs returned from model. Model may not support CDF output.")
-        
-        # Convert CDFs to numpy if they're tensors
-        cdfs_all_np = []
-        for cdf in cdfs_all:
-            if isinstance(cdf, torch.Tensor):
-                cdf = cdf.detach().cpu().numpy()
-            cdfs_all_np.append(cdf)
-        cdfs_all = cdfs_all_np
-        
+
+    if "surv" not in outputs:
+        raise ValueError(
+            "Model output does not contain 'surv'. "
+            "extract_pretrain_risk_scores() currently expects survival outputs."
+        )
+
+    cdfs_all = outputs["surv"].get("surv_CDF", None)
+
+    if cdfs_all is None:
+        raise ValueError("No CDFs returned from model: outputs['surv']['surv_CDF'] is None.")
+
+    try:
         n_events = len(cdfs_all)
-        
-        # Extract risk scores for each patient and transition
-        risk_scores_by_patient = []
-        patient_ids_list = []
-        
-        # Debug: check forward pass output
-        # Forward pass complete (production: debug output removed)
-        
-        for i, pid in enumerate(built.patient_ids):
-            # Get number of valid transitions for this patient
-            mask_sum = attention_mask[i].sum().item() if hasattr(attention_mask[i].sum(), 'item') else int(attention_mask[i].sum())
-            n_transitions_i = int(mask_sum) - 1
-            
-            if n_transitions_i <= 0:
-                continue
-            
-            # Extract CDFs for all events at all positions for this patient
-            # cdfs_all is list of ndarrays, each shape (n_patients, n_time_grid)
-            # We want risk scores per transition: [sum(cdf[i, :]) for cdf in cdfs_all]
-            
-            risk_scores_matrix = np.zeros((n_transitions_i, n_events))
-            for t in range(n_transitions_i):
-                for event_idx, cdf in enumerate(cdfs_all):
-                    # Sum CDF across time grid to get integrated risk
-                    risk_scores_matrix[t, event_idx] = float(np.sum(cdf[i, :]))
-            
-            risk_scores_by_patient.append(risk_scores_matrix)
-            patient_ids_list.append(pid)
-    
-    # Build explicit vocabulary table for R as pandas DataFrame
-    # CDF/risk columns correspond to event_ids 1..n_events (excludes <PAD> at 0)
-    # Iterate by event_id to ensure we get all events in order
-    import pandas as pd
-    
-    # Create inverse vocab: token_id -> event_name
+    except TypeError:
+        raise ValueError(
+            f"Unexpected surv_CDF type: {type(cdfs_all)}. "
+            "Expected a list/sequence of CDF arrays, one per event type."
+        )
+
+    if n_events == 0:
+        raise ValueError("No CDFs returned from model: surv_CDF has length 0.")
+
+    # Convert CDFs to numpy arrays.
+    cdfs_all_np = []
+    for cdf in cdfs_all:
+        if isinstance(cdf, torch.Tensor):
+            cdf = cdf.detach().cpu().numpy()
+        else:
+            cdf = np.asarray(cdf)
+        cdfs_all_np.append(cdf)
+
+    cdfs_all = cdfs_all_np
+
+    # Observed event IDs from the same model output used to create risk scores.
+    # This is the key fix: do not reconstruct observed events separately in R.
+    if "k" not in outputs["surv"]:
+        raise ValueError("Model survival output does not contain observed event IDs: outputs['surv']['k'].")
+
+    k_all = outputs["surv"]["k"]
+    if isinstance(k_all, torch.Tensor):
+        k_all = k_all.detach().cpu().numpy()
+    else:
+        k_all = np.asarray(k_all)
+
+    k_all = np.asarray(k_all).reshape(-1).astype(np.int64)
+
+    if len(k_all) < expected_total_transitions:
+        raise ValueError(
+            "Observed event vector is shorter than expected transitions: "
+            f"len(k_all)={len(k_all)}, expected_total_transitions={expected_total_transitions}"
+        )
+
+    # Check CDF shape. In your runs, each CDF is shape:
+    #   (total_transitions, time_grid)
+    # so we index by global transition, not patient index.
+    first_cdf = cdfs_all[0]
+
+    if first_cdf.ndim != 2:
+        raise ValueError(
+            f"Expected each CDF to be 2D with shape (n_transitions, time_grid), "
+            f"got shape {first_cdf.shape}."
+        )
+
+    if first_cdf.shape[0] < expected_total_transitions:
+        raise ValueError(
+            "CDF output has fewer transition rows than expected: "
+            f"cdf rows={first_cdf.shape[0]}, expected={expected_total_transitions}"
+        )
+
+    risk_scores_by_patient = []
+    observed_events_by_patient = []
+    patient_ids_list = []
+
+    global_t = 0
+
+    for i, pid in enumerate(built.patient_ids):
+        n_transitions_i = transition_counts[i]
+
+        if n_transitions_i <= 0:
+            continue
+
+        risk_scores_matrix = np.zeros((n_transitions_i, n_events), dtype=np.float32)
+        observed_i = np.zeros(n_transitions_i, dtype=np.int64)
+
+        for t in range(n_transitions_i):
+            for event_idx, cdf in enumerate(cdfs_all):
+                if cdf.ndim != 2:
+                    raise ValueError(
+                        f"Expected CDF for event {event_idx} to be 2D, got shape {cdf.shape}."
+                    )
+
+                # Correct indexing:
+                # cdf rows are flattened transitions across the whole batch.
+                risk_scores_matrix[t, event_idx] = float(np.sum(cdf[global_t, :]))
+
+            observed_i[t] = int(k_all[global_t])
+            global_t += 1
+
+        risk_scores_by_patient.append(risk_scores_matrix)
+        observed_events_by_patient.append(observed_i)
+        patient_ids_list.append(pid)
+
+    if global_t != expected_total_transitions:
+        raise ValueError(
+            f"Transition count mismatch after extraction: extracted {global_t}, "
+            f"expected {expected_total_transitions}."
+        )
+
+    # Build explicit vocabulary table for R.
+    # Risk columns correspond to event IDs 1..n_events.
     inv_vocab = {int(v): str(k) for k, v in event_vocab.items()}
-    
+
     iec_vocab_records = []
     for event_id in range(1, n_events + 1):
         event_name = inv_vocab.get(event_id, None)
+
         if event_name is not None:
             iec_vocab_records.append({
                 "event": event_name,
                 "event_id": int(event_id)
             })
-    
+
     event_vocab_table = pd.DataFrame(iec_vocab_records)
-    
+
+    if len(event_vocab_table) != n_events:
+        raise ValueError(
+            f"Vocabulary table has {len(event_vocab_table)} rows but risk scores have "
+            f"{n_events} columns. Check event_vocab/inv_vocab alignment."
+        )
+
     return {
         "risk_scores": risk_scores_by_patient,
+        "observed_events": observed_events_by_patient,
         "patient_ids": patient_ids_list,
         "event_vocab_table": event_vocab_table,
         "n_events": int(n_events),
+        "n_transitions": int(global_t),
     }
-
-def save_model_bundle(model_bundle: Dict[str, Any], path: str) -> None:
-    # Normalise outcomes: reticulate may have converted ["CVD"] -> "CVD" (string)
-    # during a Python->R->Python round-trip.  Always persist as a proper list.
-    _outcomes = model_bundle.get("outcomes", None)
-    if isinstance(_outcomes, str):
-        _outcomes = [_outcomes]
-    elif _outcomes is not None:
-        _outcomes = list(_outcomes)
-
-    # Normalise static columns: reticulate may have converted lists -> strings
-    _static_raw_cols = _as_list_or_none(model_bundle.get("static_raw_cols", None))
-    _static_col_names = _as_list_or_none(model_bundle.get("static_col_names", None))
-
-    payload = {
-        "type": model_bundle["type"],
-        "state_dict": model_bundle["model"].state_dict(),
-        "cfg": OmegaConf.to_container(model_bundle["cfg"], resolve=True),
-        "event_vocab": model_bundle["event_vocab"],
-        "inv_vocab": model_bundle["inv_vocab"],
-        "block_size": model_bundle["block_size"],
-        "time_scale": model_bundle.get("time_scale", 1.0),
-        "value_standardization": _normalise_value_standardization(model_bundle.get("value_standardization", None)),
-        "outcome_horizon": model_bundle.get("outcome_horizon", model_bundle.get("time_scale", 1.0)),
-        "outcomes": _outcomes,
-        "risk_model": model_bundle.get("risk_model", "competing-risk"),
-        "token_policy": model_bundle.get("token_policy", _token_policy_from_config()),
-        "static_raw_cols": _static_raw_cols,
-        "static_col_names": _static_col_names,
-        "training_duration_secs": model_bundle.get("training_duration_secs", None),
-        "device": model_bundle.get("device", "cpu"),
-    }
-    torch.save(payload, path)
 
 
 def load_model_bundle(path: str) -> Dict[str, Any]:

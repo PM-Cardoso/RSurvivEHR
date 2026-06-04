@@ -1,122 +1,271 @@
-#' Extract Event Risk Scores for Debugging
+#' High-Level Inter-Event Concordance Evaluation
 #'
-#' Extracts the full risk score matrix from a pretrained SurvivEHR model.
-#' This is a **debugging and evaluation function** that exposes the model's
-#' predicted risk for each possible next event at each transition.
+#' Performs comprehensive IEC evaluation on a pretrained model across a dataset.
+#' Extracts risk scores and observed next-event IDs in batches to avoid memory
+#' overhead from storing one massive risk matrix.
 #'
-#' Warning: For large validation sets, this can consume significant memory
-#' (n_transitions × n_events matrix). Use `max_patients` to limit extractions.
+#' @param model Fitted pretrain model bundle from `survivehr_pretrain()`.
+#' @param events Data frame with patient event history.
+#' @param static Optional static covariates data frame.
+#' @param batch_size Integer. Number of patients to process per batch.
+#' @param stratify_by_event Logical. If TRUE, compute IEC separately for each
+#'   true next-event type.
+#' @param aggregate_only Logical. If TRUE, return only summary statistics.
 #'
-#' @param model Fitted pretrain model bundle returned from `survivehr_pretrain()`.
+#' @return S3 object of class `"survivehr_iec_eval"`.
 #'
-#' @param events Data frame with patient event history. Columns:
-#'   patient_id, time_years, event_name, value (optional).
-#'
-#' @param static Optional data frame with static covariates. Columns:
-#'   patient_id, covariate columns.
-#'
-#' @param max_patients Maximum number of patients to extract (for memory safety).
-#'   If NULL (default), all patients are processed.
-#'
-#' @return List with elements:
-#'   \item{risk_matrix}{Matrix of shape (total_transitions, n_events) containing
-#'     risk scores. Rows correspond to transitions across all patients.}
-#'   \item{patient_ids}{List mapping row to patient_id for traceability.}
-#'   \item{event_vocab}{Character vector of event names (column names).}
-#'   \item{n_events}{Integer, total number of events in vocabulary.}
-#'
-#' @details
-#' This function is designed for:
-#' - Manual IEC calculation on extracted risk scores
-#' - Model debugging and inspection
-#' - Computing ranking-based metrics
-#'
-#' For automated evaluation, use `survivehr_evaluate_iec()` instead,
-#' which handles batch processing and memory management automatically.
-#'
-#' @keywords internal
 #' @export
-survivehr_predict_event_risks <- function(
+survivehr_evaluate_iec <- function(
   model,
   events,
   static = NULL,
-  max_patients = NULL
+  batch_size = 32,
+  stratify_by_event = TRUE,
+  aggregate_only = TRUE
 ) {
   # Validate model
   if (!is.list(model) || is.null(model$model) || is.null(model$event_vocab)) {
     stop("model must be a RSurvivEHR model bundle with model and event_vocab")
   }
 
-  # Enforce max_patients limit for memory safety
-  if (!is.null(max_patients)) {
-    unique_patients <- unique(events$patient_id)
-    if (length(unique_patients) > max_patients) {
-      selected_patients <- head(unique_patients, max_patients)
-      events <- events[events$patient_id %in% selected_patients, ]
-      if (!is.null(static)) {
-        static <- static[static$patient_id %in% selected_patients, ]
-      }
-      warning(
-        "Limited to first ", max_patients, " unique patients. ",
-        "Set max_patients=NULL to process all patients."
-      )
-    }
+  # Validate input data
+  survivehr_validate_events(events)
+
+  if (!is.null(static)) {
+    survivehr_validate_static(static)
   }
 
-  # Call Python backend
-  backend <- .survivehr_backend()
+  if (!is.numeric(batch_size) || length(batch_size) != 1 || batch_size < 1) {
+    stop("batch_size must be a positive integer")
+  }
 
-  py_result <- backend$extract_pretrain_risk_scores(
-    model_bundle = model,
-    events_df = events,
-    static_df = static
+  batch_size <- as.integer(batch_size)
+
+  # Split patients into batches
+  unique_patients <- unique(events$patient_id)
+  n_patients <- length(unique_patients)
+  n_batches <- ceiling(n_patients / batch_size)
+
+  # Initialise aggregation containers
+  all_iec_values <- numeric()
+  all_observed_events <- integer()
+  all_observed_ranks <- integer()
+  all_observed_ranks_from_top <- integer()
+  all_errors <- character()
+  by_event_aggregates <- list()
+  batch_results <- list()
+
+  # Process batches
+  for (batch_idx in seq_len(n_batches)) {
+    batch_start <- (batch_idx - 1) * batch_size + 1
+    batch_end <- min(batch_idx * batch_size, n_patients)
+    batch_patients <- unique_patients[batch_start:batch_end]
+
+    events_batch <- events[events$patient_id %in% batch_patients, , drop = FALSE]
+
+    static_batch <- NULL
+    if (!is.null(static)) {
+      static_batch <- static[static$patient_id %in% batch_patients, , drop = FALSE]
+    }
+
+    tryCatch(
+      {
+        risks <- survivehr_predict_event_risks(
+          model = model,
+          events = events_batch,
+          static = static_batch,
+          max_patients = NULL
+        )
+
+        if (is.null(risks$risk_matrix)) {
+          stop("No risk_matrix returned from survivehr_predict_event_risks().")
+        }
+
+        if (is.null(risks$observed_events)) {
+          stop(
+            "No observed_events returned from survivehr_predict_event_risks(). ",
+            "The Python backend should return observed next-event IDs from outputs['surv']['k']."
+          )
+        }
+
+        if (!is.matrix(risks$risk_matrix) && !is.data.frame(risks$risk_matrix)) {
+          stop(
+            "risk_matrix must be a matrix or data.frame. Got class: ",
+            paste(class(risks$risk_matrix), collapse = ", ")
+          )
+        }
+
+        if (nrow(risks$risk_matrix) != length(risks$observed_events)) {
+          stop(
+            "Risk/observed transition mismatch in batch ", batch_idx, ": ",
+            "nrow(risk_matrix) = ", nrow(risks$risk_matrix),
+            ", length(observed_events) = ", length(risks$observed_events),
+            ". These should match because both are returned from the same Python-built model sequence."
+          )
+        }
+
+        iec_batch <- survivehr_compute_iec(
+          risk_scores = risks$risk_matrix,
+          observed_events = risks$observed_events,
+          stratify_by_event = stratify_by_event,
+          event_vocabulary = risks$event_names
+        )
+
+        # Accumulate transition-level values when available
+        all_iec_values <- c(all_iec_values, iec_batch$iec_values)
+        all_observed_events <- c(all_observed_events, risks$observed_events)
+        all_observed_ranks <- c(all_observed_ranks, iec_batch$observed_ranks)
+        all_observed_ranks_from_top <- c(
+          all_observed_ranks_from_top,
+          iec_batch$observed_ranks_from_top
+        )
+        all_errors <- c(all_errors, iec_batch$errors)
+
+        # Accumulate stratified event-level results
+        if (stratify_by_event && !is.null(iec_batch$by_event) && nrow(iec_batch$by_event) > 0) {
+          for (idx in seq_len(nrow(iec_batch$by_event))) {
+            event_name <- as.character(iec_batch$by_event$event[idx])
+
+            if (!(event_name %in% names(by_event_aggregates))) {
+              by_event_aggregates[[event_name]] <- list(
+                iec_sum = 0,
+                n_obs = 0
+              )
+            }
+
+            by_event_aggregates[[event_name]]$iec_sum <-
+              by_event_aggregates[[event_name]]$iec_sum +
+              iec_batch$by_event$mean_iec[idx] * iec_batch$by_event$n_obs[idx]
+
+            by_event_aggregates[[event_name]]$n_obs <-
+              by_event_aggregates[[event_name]]$n_obs +
+              iec_batch$by_event$n_obs[idx]
+          }
+        }
+
+        if (!aggregate_only) {
+          batch_results[[batch_idx]] <- list(
+            batch_patients = batch_patients,
+            mean_iec = iec_batch$mean_iec,
+            n_valid = iec_batch$n_valid,
+            n_total = iec_batch$n_total,
+            iec_values = iec_batch$iec_values,
+            observed_events = risks$observed_events,
+            observed_ranks = iec_batch$observed_ranks,
+            observed_ranks_from_top = iec_batch$observed_ranks_from_top,
+            by_event = iec_batch$by_event,
+            errors = iec_batch$errors
+          )
+        }
+      },
+      error = function(e) {
+        warning("Batch ", batch_idx, " failed: ", e$message, call. = FALSE)
+        all_errors <<- c(
+          all_errors,
+          paste0("Batch ", batch_idx, " failed: ", e$message)
+        )
+      }
+    )
+  }
+
+  # Finalise stratified aggregates
+  by_event_df <- NULL
+
+  if (stratify_by_event && length(by_event_aggregates) > 0) {
+    by_event_df <- data.frame(
+      event = names(by_event_aggregates),
+      mean_iec = vapply(
+        by_event_aggregates,
+        function(x) {
+          if (x$n_obs > 0) x$iec_sum / x$n_obs else NA_real_
+        },
+        numeric(1)
+      ),
+      n_obs = vapply(
+        by_event_aggregates,
+        function(x) x$n_obs,
+        numeric(1)
+      ),
+      stringsAsFactors = FALSE
+    )
+
+    rownames(by_event_df) <- NULL
+
+    by_event_df <- by_event_df[order(by_event_df$event), , drop = FALSE]
+  }
+
+  # Final overall summary
+  #
+  # Usually all_iec_values will be available. If not, fall back to the weighted
+  # event-level mean from by_event_df.
+  if (length(all_iec_values) > 0) {
+    final_mean_iec <- mean(all_iec_values, na.rm = TRUE)
+    final_n_valid <- sum(!is.na(all_iec_values))
+  } else if (!is.null(by_event_df) && nrow(by_event_df) > 0) {
+    final_n_valid <- sum(by_event_df$n_obs, na.rm = TRUE)
+
+    final_mean_iec <- if (final_n_valid > 0) {
+      sum(by_event_df$mean_iec * by_event_df$n_obs, na.rm = TRUE) / final_n_valid
+    } else {
+      0
+    }
+  } else {
+    final_mean_iec <- 0
+    final_n_valid <- 0
+  }
+
+  # n_total should be the number of model-used observed transitions, not the raw
+  # number of rows in the input event table.
+  final_n_total <- length(all_observed_events)
+
+  result <- list(
+    mean_iec = final_mean_iec,
+    n_valid = final_n_valid,
+    n_total = final_n_total,
+    iec_values = if (aggregate_only) NULL else all_iec_values,
+    observed_events = if (aggregate_only) NULL else all_observed_events,
+    observed_ranks = if (aggregate_only) NULL else all_observed_ranks,
+    observed_ranks_from_top = if (aggregate_only) NULL else all_observed_ranks_from_top,
+    by_event = by_event_df,
+    by_batch = if (aggregate_only) NULL else batch_results,
+    errors = all_errors,
+    stratified = stratify_by_event,
+    aggregate_only = aggregate_only
   )
 
-  # Combine risk scores from all patients into single matrix
-  # Use [[ ]] to access Python dict keys, not $ (which tries attributes)
-  risk_scores <- reticulate::py_to_r(py_result[["risk_scores"]])
-  
-  if (is.null(risk_scores) || length(risk_scores) == 0) {
-    stop(
-      "extract_pretrain_risk_scores() returned empty risk_scores list. \n",
-      "Check Python debug output above for why patients were skipped. \n",
-      "This usually means the model's CDF outputs are not in the expected shape.\n",
-      "CDFs should be shaped: (n_patients, n_time_grid) for each event type."
-    )
-  }
-
-  # Properly repeat patient IDs: one ID per row of risk matrix per patient
-  patient_ids_py <- reticulate::py_to_r(py_result[["patient_ids"]])
-  patient_ids <- unlist(Map(
-    function(pid, mat) rep(as.character(pid), nrow(mat)),
-    patient_ids_py,
-    risk_scores
-  ))
-
-  # Extract vocab table returned from Python (now a pandas DataFrame)
-  vocab_table <- reticulate::py_to_r(py_result[["event_vocab_table"]])
-  vocab_table$event_id <- as.integer(vocab_table$event_id)
-  vocab_table <- vocab_table[order(vocab_table$event_id), ]
-  
-  # Sanity check: vocab must match risk matrix columns
-  if (nrow(vocab_table) != ncol(do.call(rbind, risk_scores))) {
-    stop(
-      "Vocabulary/risk matrix mismatch: vocab_table has ", nrow(vocab_table),
-      " rows but risk_matrix has ", ncol(do.call(rbind, risk_scores)), " columns."
-    )
-  }
-  
-  # Create named vector: event_name -> event_id (for IEC)
-  event_names <- as.character(vocab_table$event)
-  event_vocab_for_iec <- setNames(vocab_table$event_id, vocab_table$event)
-
-  return(list(
-    risk_scores = risk_scores,
-    patient_ids = patient_ids,
-    event_vocab = event_vocab_for_iec,
-    event_names = event_names,
-    event_vocab_table = vocab_table,
-    n_events = as.integer(py_result[["n_events"]])
-  ))
+  class(result) <- c("survivehr_iec_eval", "list")
+  result
 }
 
+
+#' Print Method for IEC Evaluation Results
+#'
+#' @param x Object of class "survivehr_iec_eval"
+#' @param ... Additional arguments ignored.
+#'
+#' @export
+print.survivehr_iec_eval <- function(x, ...) {
+  cat("=== SurvivEHR IEC Evaluation ===\n")
+  cat(
+    "Mean IEC: ",
+    sprintf("%.4f", x$mean_iec),
+    " (", x$n_valid, " / ", x$n_total, " valid transitions)\n",
+    sep = ""
+  )
+
+  if (length(x$errors) > 0) {
+    cat("Batch/transition errors: ", length(x$errors), "\n", sep = "")
+  }
+
+  if (x$stratified && !is.null(x$by_event)) {
+    cat("\nIEC by event type:\n")
+    print(x$by_event, row.names = FALSE)
+  }
+
+  if (!x$aggregate_only && !is.null(x$by_batch) && length(x$by_batch) > 0) {
+    cat("\nBatch processing: ", length(x$by_batch), " batches\n", sep = "")
+  }
+
+  cat("\n")
+  invisible(x)
+}
