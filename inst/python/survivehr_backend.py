@@ -1413,34 +1413,42 @@ def extract_pretrain_risk_scores(
 
     k_all = outputs["surv"]["k"]
 
-    # Convert observed event IDs safely to a flat NumPy integer array.
-    # outputs["surv"]["k"] may be:
-    #   - a torch.Tensor
-    #   - a list/tuple of torch.Tensors
-    #   - already a numpy array/list
-    if isinstance(k_all, torch.Tensor):
-        k_all = k_all.detach().cpu().numpy()
+    def _flatten_observed_event_ids(x):
+        """Convert nested torch/list/array event IDs to a flat NumPy array."""
+        if isinstance(x, torch.Tensor):
+            return x.detach().cpu().numpy().reshape(-1)
 
-    elif isinstance(k_all, (list, tuple)):
-        converted = []
+        if isinstance(x, np.ndarray):
+            if x.dtype == object:
+                parts = []
+                for item in x.reshape(-1):
+                    arr = _flatten_observed_event_ids(item)
+                    if arr.size > 0:
+                        parts.append(arr)
 
-        for x in k_all:
-            if isinstance(x, torch.Tensor):
-                x = x.detach().cpu().numpy()
-            else:
-                x = np.asarray(x)
+                if len(parts) == 0:
+                    return np.array([], dtype=np.int64)
 
-            converted.append(np.asarray(x).reshape(-1))
+                return np.concatenate(parts)
 
-        if len(converted) == 0:
-            k_all = np.array([], dtype=np.int64)
-        else:
-            k_all = np.concatenate(converted)
+            return x.reshape(-1)
 
-    else:
-        k_all = np.asarray(k_all)
+        if isinstance(x, (list, tuple)):
+            parts = []
 
-    k_all = np.asarray(k_all).reshape(-1).astype(np.int64)
+            for item in x:
+                arr = _flatten_observed_event_ids(item)
+                if arr.size > 0:
+                    parts.append(arr)
+
+            if len(parts) == 0:
+                return np.array([], dtype=np.int64)
+
+            return np.concatenate(parts)
+
+        return np.array([x])
+
+    k_all = _flatten_observed_event_ids(k_all).astype(np.int64)
 
     if len(k_all) < expected_total_transitions:
         raise ValueError(

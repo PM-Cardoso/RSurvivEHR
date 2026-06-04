@@ -316,9 +316,14 @@ def compute_iec_stratified(
     
     return {
         'mean_iec': float(mean_iec),
+        'iec_values': batch_result['iec_values'],
+        'observed_ranks': batch_result['observed_ranks'],
+        'observed_ranks_from_top': batch_result['observed_ranks_from_top'],
         'by_event': by_event,
         'n_valid': batch_result['n_valid'],
         'n_total': batch_result['n_total'],
+        'errors': batch_result['errors'],
+        'error_indices': batch_result['error_indices'],
         'n_events': len(unique_events),
         'event_indices': sorted(list(unique_events))
     }
