@@ -1544,6 +1544,55 @@ def extract_pretrain_risk_scores(
     }
 
 
+def save_model_bundle(model_bundle: Dict[str, Any], path: str) -> None:
+    """Save a model bundle (pretrain or finetune) to disk.
+    
+    Serialises the model weights, vocabulary, configuration, and all metadata
+    to a PyTorch .pt file for later loading with load_model_bundle().
+    
+    Args:
+        model_bundle: Dict returned by train_pretrain_model() or train_finetune_model()
+        path: File path (string) where the bundle will be saved
+    """
+    # Ensure path is a string (reticulate sometimes passes R paths)
+    path = str(path)
+    
+    # Extract model state dict
+    model = model_bundle["model"]
+    state_dict = model.state_dict() if hasattr(model, "state_dict") else {}
+    
+    # Prepare payload to save
+    payload = {
+        "type": model_bundle["type"],  # "pretrain" or "finetune"
+        "state_dict": state_dict,
+        "cfg": OmegaConf.to_container(model_bundle["cfg"]),
+        "event_vocab": model_bundle["event_vocab"],
+        "inv_vocab": model_bundle["inv_vocab"],
+        "block_size": model_bundle.get("block_size", 128),
+        "time_scale": model_bundle.get("time_scale", 1.0),
+        "value_standardization": model_bundle.get("value_standardization", {}),
+        "token_policy": model_bundle.get("token_policy", _token_policy_from_config()),
+        "static_raw_cols": _as_list_or_none(model_bundle.get("static_raw_cols", None)),
+        "static_col_names": _as_list_or_none(model_bundle.get("static_col_names", None)),
+        "training_duration_secs": model_bundle.get("training_duration_secs", None),
+        "device": str(model_bundle.get("device", "cpu")),
+    }
+    
+    # For fine-tuned bundles, also save outcomes and risk_model
+    if model_bundle["type"] == "finetune":
+        outcomes = model_bundle.get("outcomes", None)
+        if outcomes is not None:
+            # Normalize: ensure it's a list, not a string
+            if isinstance(outcomes, str):
+                outcomes = [outcomes]
+            payload["outcomes"] = list(outcomes)
+        payload["risk_model"] = model_bundle.get("risk_model", "competing-risk")
+        payload["outcome_horizon"] = model_bundle.get("outcome_horizon", model_bundle.get("time_scale", 1.0))
+    
+    # Save to file
+    torch.save(payload, path)
+
+
 def load_model_bundle(path: str) -> Dict[str, Any]:
     payload = torch.load(path, map_location="cpu")
     cfg = OmegaConf.create(payload["cfg"])
