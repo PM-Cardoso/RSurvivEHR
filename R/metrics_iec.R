@@ -156,6 +156,9 @@ survivehr_compute_iec <- function(
 #' @param x Object of class "survivehr_iec"
 #' @param ... Additional arguments (ignored)
 #'
+#' @return `x`, invisibly.
+#'
+#' @keywords internal
 #' @export
 print.survivehr_iec <- function(x, ...) {
   cat("=== SurvivEHR Inter-Event Concordance (IEC) ===\n")

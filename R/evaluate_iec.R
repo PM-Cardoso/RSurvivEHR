@@ -243,6 +243,9 @@ survivehr_evaluate_iec <- function(
 #' @param x Object of class `"survivehr_iec_eval"`.
 #' @param ... Additional arguments ignored.
 #'
+#' @return `x`, invisibly.
+#'
+#' @keywords internal
 #' @export
 print.survivehr_iec_eval <- function(x, ...) {
   cat("=== SurvivEHR IEC Evaluation ===\n")

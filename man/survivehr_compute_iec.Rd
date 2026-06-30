@@ -45,7 +45,7 @@ score matrices, typically obtained from model predictions.
 \details{
 This implements the ranking-based concordance calculation from the original SurvivEHR
 model: for each transition, ranks all possible next events by their predicted risk,
-finds the rank position of the true observed event, and normalizes to \link{0,1}.
+finds the rank position of the true observed event, and normalizes to 0,1.
 
 IEC Interpretation:
 \itemize{

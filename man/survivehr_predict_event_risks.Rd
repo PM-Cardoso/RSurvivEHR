@@ -2,7 +2,7 @@
 % Please edit documentation in R/predict_risks.R
 \name{survivehr_predict_event_risks}
 \alias{survivehr_predict_event_risks}
-\title{Extract Event Risk Scores for Debugging}
+\title{Extract Event Risk Scores for IEC Evaluation}
 \usage{
 survivehr_predict_event_risks(
   model,
@@ -12,42 +12,46 @@ survivehr_predict_event_risks(
 )
 }
 \arguments{
-\item{model}{Fitted pretrain model bundle returned from \code{survivehr_pretrain()}.}
+\item{model}{Fitted pretrain model bundle returned from \code{survivehr_pretrain()}
+or \code{survivehr_load_model()}.}
 
-\item{events}{Data frame with patient event history. Columns:
-patient_id, time_years, event_name, value (optional).}
+\item{events}{Data frame with patient event history. Required columns:
+\code{patient_id}, \code{event}, \code{age}; optional column: \code{value}.}
 
-\item{static}{Optional data frame with static covariates. Columns:
-patient_id, covariate columns.}
+\item{static}{Optional data frame with static covariates. Must contain
+\code{patient_id} and the same static covariate columns used during training.}
 
-\item{max_patients}{Maximum number of patients to extract (for memory safety).
-If NULL (default), all patients are processed.}
+\item{max_patients}{Optional integer. Maximum number of patients to process.
+Useful for debugging or memory-limited runs. If \code{NULL}, all patients are
+processed.}
 }
 \value{
 List with elements:
-\item{risk_matrix}{Matrix of shape (total_transitions, n_events) containing
-risk scores. Rows correspond to transitions across all patients.}
-\item{patient_ids}{List mapping row to patient_id for traceability.}
-\item{event_vocab}{Character vector of event names (column names).}
-\item{n_events}{Integer, total number of events in vocabulary.}
+\item{risk_matrix}{Numeric matrix of shape
+\verb{total_transitions x n_events}.}
+\item{risk_scores}{List of per-patient risk matrices.}
+\item{observed_events}{Integer vector of observed next-event IDs aligned
+to rows of \code{risk_matrix}.}
+\item{patient_ids}{Character vector mapping each transition row to a
+patient ID.}
+\item{event_vocab}{Named integer vector mapping event names to
+1-indexed risk-matrix column IDs.}
+\item{event_names}{Character vector of event names ordered by risk-matrix
+columns.}
+\item{event_vocab_table}{Data frame with columns \code{event} and \code{event_id}.}
+\item{n_events}{Integer. Number of predictable event types.}
 }
 \description{
 Extracts the full risk score matrix from a pretrained SurvivEHR model.
-This is a \strong{debugging and evaluation function} that exposes the model's
-predicted risk for each possible next event at each transition.
+This function exposes the model's predicted risk for each possible next event
+at each observed transition, together with the observed next-event IDs used
+by the Python backend.
 }
 \details{
-Warning: For large validation sets, this can consume significant memory
-(n_transitions × n_events matrix). Use \code{max_patients} to limit extractions.
+This function is mainly used internally by \code{survivehr_evaluate_iec()}, but is
+exported because it is useful for debugging and manual IEC calculations.
 
-This function is designed for:
-\itemize{
-\item Manual IEC calculation on extracted risk scores
-\item Model debugging and inspection
-\item Computing ranking-based metrics
+Observed events are returned from the Python backend from the same model-built
+sequence as the risk scores. This avoids dimension mismatches that can occur
+if observed transitions are reconstructed independently in R.
 }
-
-For automated evaluation, use \code{survivehr_evaluate_iec()} instead,
-which handles batch processing and memory management automatically.
-}
-\keyword{internal}

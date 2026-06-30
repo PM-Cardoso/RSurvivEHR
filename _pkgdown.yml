@@ -68,6 +68,8 @@ navbar:
           href: articles/model-architecture.html
         - text: "Data pipeline internals"
           href: articles/data-pipeline.html
+        - text: "Evaluating predictions with IEC"
+          href: articles/iec-evaluation.html
     github:
       icon: fab fa-github
       href: https://github.com/PM-Cardoso/RSurvivEHR
@@ -100,4 +102,13 @@ reference:
       - survivehr_validate_events
       - survivehr_validate_static
       - survivehr_validate_targets
+
+  - title: "Evaluation"
+    desc: >
+      Evaluate how well model risk scores rank competing next events with
+      Inter-Event Concordance (IEC).
+    contents:
+      - survivehr_compute_iec
+      - survivehr_predict_event_risks
+      - survivehr_evaluate_iec
 

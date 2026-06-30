@@ -20,58 +20,18 @@ survivehr_evaluate_iec(
 
 \item{static}{Optional static covariates data frame.}
 
-\item{batch_size}{Integer. Number of patients to process per batch (default: 32).
-Increase for speed, decrease for memory safety.}
+\item{batch_size}{Integer. Number of patients to process per batch.}
 
 \item{stratify_by_event}{Logical. If TRUE, compute IEC separately for each
-event type to identify if model has bias by event prevalence (default: TRUE).}
+true next-event type.}
 
-\item{aggregate_only}{Logical. If TRUE (default), return only summary statistics
-(mean_iec, by_event). If FALSE, return full per-transition IEC values
-(can be memory-intensive for large datasets).}
+\item{aggregate_only}{Logical. If TRUE, return only summary statistics.}
 }
 \value{
-S3 object of class "survivehr_iec_eval" (list) with elements:
-\item{mean_iec}{Numeric. Global mean IEC across all transitions.}
-\item{n_valid}{Integer. Number of successfully processed transitions.}
-\item{n_total}{Integer. Total number of transitions.}
-\item{by_event}{Data frame (if stratified). Columns: event_id, mean_iec, n_obs.}
-\item{by_batch}{List of per-batch statistics (if aggregate_only=FALSE).}
-\item{errors}{Character vector. Error messages from failed transitions.}
-\item{stratified}{Logical. Whether stratification was requested.}
-\item{aggregate_only}{Logical. Whether only aggregates are stored.}
+S3 object of class \code{"survivehr_iec_eval"}.
 }
 \description{
 Performs comprehensive IEC evaluation on a pretrained model across a dataset.
-Automatically extracts observed events and computes IEC in batches to avoid
-memory overhead of storing massive risk matrices.
-}
-\details{
-Processing:
-\enumerate{
-\item Extracts observed events from input data (transitions: i → i+1)
-\item Processes patients in batches to manage memory
-\item For each batch:
-\itemize{
-\item Extracts risk scores via \code{survivehr_predict_event_risks()}
-\item Computes IEC via \code{survivehr_compute_iec()}
-\item Aggregates statistics
-}
-\item Returns summary or full results depending on \code{aggregate_only}
-}
-}
-\examples{
-\dontrun{
-# Evaluate on test set with stratification
-eval_result <- survivehr_evaluate_iec(
-  model = pretrained_model,
-  events = test_events,
-  static = test_static,
-  batch_size = 32,
-  stratify_by_event = TRUE,
-  aggregate_only = TRUE
-)
-print(eval_result)
-}
-
+Extracts risk scores and observed next-event IDs in batches to avoid memory
+overhead from storing one massive risk matrix.
 }

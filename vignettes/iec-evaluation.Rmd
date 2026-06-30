@@ -134,6 +134,7 @@ print(iec_eval)
 
 ```{r}
 library(RSurvivEHR)
+library(dplyr)   # for the data-wrangling pipes used below
 
 # 1. Setup and load data
 survivehr_setup()

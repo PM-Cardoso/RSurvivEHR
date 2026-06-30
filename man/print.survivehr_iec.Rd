@@ -11,6 +11,10 @@
 
 \item{...}{Additional arguments (ignored)}
 }
+\value{
+\code{x}, invisibly.
+}
 \description{
 Print Method for IEC Results
 }
+\keyword{internal}

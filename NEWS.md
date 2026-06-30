@@ -1,3 +1,33 @@
+# RSurvivEHR 0.10.0
+
+### Documentation site: Inter-Event Concordance (IEC) is now fully integrated
+
+The IEC evaluation feature (introduced in 0.9.3) is now wired into the pkgdown
+website and the package documentation, fixing the
+`build_reference_index()` failure *"topics missing from index"*.
+
+* **New pkgdown reference section "Evaluation"** in `_pkgdown.yml` listing the
+  three IEC functions: `survivehr_compute_iec()`,
+  `survivehr_predict_event_risks()`, and `survivehr_evaluate_iec()`.
+* **New article in the navbar**: the *"Evaluating predictions with IEC"*
+  vignette (`vignettes/iec-evaluation.Rmd`) is now linked under
+  *Articles → Evaluating predictions with IEC*.
+* **S3 print methods marked internal**: `print.survivehr_iec()` and
+  `print.survivehr_iec_eval()` now carry `@keywords internal`, so they no
+  longer clutter the reference index while remaining exported and usable.
+* **Regenerated man pages** from the current roxygen sources, bringing the
+  previously stale `survivehr_predict_event_risks.Rd`,
+  `survivehr_evaluate_iec.Rd`, and `survivehr_compute_iec.Rd` back in sync
+  with the documented arguments and return values, and removing the orphan
+  `extract_observed_events.Rd`.
+* **IEC vignette polish**: the complete worked example now loads `dplyr`
+  explicitly for the data-wrangling pipes it uses.
+
+`pkgdown::check_pkgdown()` now reports *"No problems found in _pkgdown.yml"*.
+
+**Changed files:** `_pkgdown.yml`, `R/metrics_iec.R`, `R/evaluate_iec.R`,
+`man/*.Rd`, `vignettes/iec-evaluation.Rmd`, `DESCRIPTION`
+
 # RSurvivEHR 0.9.3
 
 ### New feature: Inter-Event Concordance (IEC) metric for evaluating competing-risk predictions

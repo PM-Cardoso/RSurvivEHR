@@ -7,10 +7,14 @@
 \method{print}{survivehr_iec_eval}(x, ...)
 }
 \arguments{
-\item{x}{Object of class "survivehr_iec_eval"}
+\item{x}{Object of class \code{"survivehr_iec_eval"}.}
 
-\item{...}{Additional arguments (ignored)}
+\item{...}{Additional arguments ignored.}
+}
+\value{
+\code{x}, invisibly.
 }
 \description{
 Print Method for IEC Evaluation Results
 }
+\keyword{internal}
