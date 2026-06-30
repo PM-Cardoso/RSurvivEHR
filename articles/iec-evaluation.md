@@ -123,6 +123,7 @@ results by event type - Handles missing events gracefully
 ``` r
 
 library(RSurvivEHR)
+library(dplyr)   # for the data-wrangling pipes used below
 
 # 1. Setup and load data
 survivehr_setup()
@@ -226,8 +227,9 @@ reveal potential for targeted fine-tuning or reweighting
     patterns
 3.  **Compare across model configurations** (layers, heads, learning
     rate) to find the best architecture
-4.  **Use `aggregate_only=FALSE`** in `survivehr_evaluate_iec()` if you
-    need per-transition scores for visualization
+4.  **Use `aggregate_only=FALSE`** in
+    [`survivehr_evaluate_iec()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_evaluate_iec.md)
+    if you need per-transition scores for visualization
 5.  **Monitor IEC during fine-tuning** to track downstream task
     performance
 

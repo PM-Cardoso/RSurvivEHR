@@ -1,5 +1,43 @@
 # Changelog
 
+## RSurvivEHR 0.10.0
+
+#### Documentation site: Inter-Event Concordance (IEC) is now fully integrated
+
+The IEC evaluation feature (introduced in 0.9.3) is now wired into the
+pkgdown website and the package documentation, fixing the
+`build_reference_index()` failure *“topics missing from index”*.
+
+- **New pkgdown reference section “Evaluation”** in `_pkgdown.yml`
+  listing the three IEC functions:
+  [`survivehr_compute_iec()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_compute_iec.md),
+  [`survivehr_predict_event_risks()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict_event_risks.md),
+  and
+  [`survivehr_evaluate_iec()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_evaluate_iec.md).
+- **New article in the navbar**: the *“Evaluating predictions with IEC”*
+  vignette (`vignettes/iec-evaluation.Rmd`) is now linked under
+  *Articles → Evaluating predictions with IEC*.
+- **S3 print methods marked internal**:
+  [`print.survivehr_iec()`](https://pm-cardoso.github.io/RSurvivEHR/reference/print.survivehr_iec.md)
+  and
+  [`print.survivehr_iec_eval()`](https://pm-cardoso.github.io/RSurvivEHR/reference/print.survivehr_iec_eval.md)
+  now carry `@keywords internal`, so they no longer clutter the
+  reference index while remaining exported and usable.
+- **Regenerated man pages** from the current roxygen sources, bringing
+  the previously stale `survivehr_predict_event_risks.Rd`,
+  `survivehr_evaluate_iec.Rd`, and `survivehr_compute_iec.Rd` back in
+  sync with the documented arguments and return values, and removing the
+  orphan `extract_observed_events.Rd`.
+- **IEC vignette polish**: the complete worked example now loads `dplyr`
+  explicitly for the data-wrangling pipes it uses.
+
+[`pkgdown::check_pkgdown()`](https://pkgdown.r-lib.org/reference/check_pkgdown.html)
+now reports \*“No problems found in \_pkgdown.yml”\*.
+
+**Changed files:** `_pkgdown.yml`, `R/metrics_iec.R`,
+`R/evaluate_iec.R`, `man/*.Rd`, `vignettes/iec-evaluation.Rmd`,
+`DESCRIPTION`
+
 ## RSurvivEHR 0.9.3
 
 #### New feature: Inter-Event Concordance (IEC) metric for evaluating competing-risk predictions
@@ -7,14 +45,16 @@
 Three new functions enable evaluation of how well model risk scores rank
 next events:
 
-- `survivehr_compute_iec()`: Pure metric calculation from pre-computed
-  risk scores and observed events. Returns overall IEC and optional
-  per-event stratification.
-- `survivehr_predict_event_risks()`: Debug utility to extract full risk
-  score matrices from pretrain models for inspection or custom analysis.
-- `survivehr_evaluate_iec()`: End-to-end production workflow combining
-  model inference, risk score extraction, and IEC computation with
-  batch-wise aggregation for memory efficiency.
+- [`survivehr_compute_iec()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_compute_iec.md):
+  Pure metric calculation from pre-computed risk scores and observed
+  events. Returns overall IEC and optional per-event stratification.
+- [`survivehr_predict_event_risks()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict_event_risks.md):
+  Debug utility to extract full risk score matrices from pretrain models
+  for inspection or custom analysis.
+- [`survivehr_evaluate_iec()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_evaluate_iec.md):
+  End-to-end production workflow combining model inference, risk score
+  extraction, and IEC computation with batch-wise aggregation for memory
+  efficiency.
 
 IEC (Inter-Event Concordance) is a ranking-based metric that measures
 how well predicted risk scores order competing next events: - IEC ≈ 1.0:

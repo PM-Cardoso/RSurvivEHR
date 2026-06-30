@@ -42,3 +42,15 @@ Validate input data frames before passing to training functions.
   : Validate the static covariates data frame for RSurvivEHR
 - [`survivehr_validate_targets()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_validate_targets.md)
   : Validate the fine-tune targets data frame for RSurvivEHR
+
+## Evaluation
+
+Evaluate how well model risk scores rank competing next events with
+Inter-Event Concordance (IEC).
+
+- [`survivehr_compute_iec()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_compute_iec.md)
+  : Compute Inter-Event Concordance (IEC) from Risk Scores
+- [`survivehr_predict_event_risks()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict_event_risks.md)
+  : Extract Event Risk Scores for IEC Evaluation
+- [`survivehr_evaluate_iec()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_evaluate_iec.md)
+  : High-Level Inter-Event Concordance Evaluation

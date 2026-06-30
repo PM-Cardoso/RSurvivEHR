@@ -111,7 +111,7 @@ article.
 | **Leakage-free fine-tuning** | Context is restricted to events before the target age. |
 | **Flexible static covariates** | Any column names; any mix of categorical and numeric. |
 | **Continuous readings** | Record measurements (BP, HbA1c, BMI) in the `value` column. |
-| **Inter-Event Concordance (IEC) evaluation** | `survivehr_compute_iec()` + `survivehr_evaluate_iec()` measure how well risk scores rank competing events. |
+| **Inter-Event Concordance (IEC) evaluation** | [`survivehr_compute_iec()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_compute_iec.md) + [`survivehr_evaluate_iec()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_evaluate_iec.md) measure how well risk scores rank competing events. |
 | **Save / load** | [`survivehr_save_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.md) / [`survivehr_load_model()`](https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_load_model.md) preserve vocabulary, weights, and column schema. |
 | **HPC-friendly** | Compatible with Python ≥ 3.8 (no `match`/`case` syntax). |
 

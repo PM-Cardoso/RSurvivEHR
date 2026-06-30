@@ -10,11 +10,17 @@
 <url><loc>https://pm-cardoso.github.io/RSurvivEHR/authors.html</loc></url>
 <url><loc>https://pm-cardoso.github.io/RSurvivEHR/index.html</loc></url>
 <url><loc>https://pm-cardoso.github.io/RSurvivEHR/news/index.html</loc></url>
+<url><loc>https://pm-cardoso.github.io/RSurvivEHR/reference/convert_iec_result.html</loc></url>
 <url><loc>https://pm-cardoso.github.io/RSurvivEHR/reference/index.html</loc></url>
+<url><loc>https://pm-cardoso.github.io/RSurvivEHR/reference/print.survivehr_iec.html</loc></url>
+<url><loc>https://pm-cardoso.github.io/RSurvivEHR/reference/print.survivehr_iec_eval.html</loc></url>
+<url><loc>https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_compute_iec.html</loc></url>
 <url><loc>https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_config.html</loc></url>
+<url><loc>https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_evaluate_iec.html</loc></url>
 <url><loc>https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_finetune.html</loc></url>
 <url><loc>https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_load_model.html</loc></url>
 <url><loc>https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict.html</loc></url>
+<url><loc>https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict_event_risks.html</loc></url>
 <url><loc>https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_predict_value.html</loc></url>
 <url><loc>https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_pretrain.html</loc></url>
 <url><loc>https://pm-cardoso.github.io/RSurvivEHR/reference/survivehr_save_model.html</loc></url>

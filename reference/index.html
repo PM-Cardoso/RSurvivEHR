@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -23,6 +23,7 @@
     <li><a class="dropdown-item" href="../articles/advanced-topics.html">Advanced topics</a></li>
     <li><a class="dropdown-item" href="../articles/model-architecture.html">Model architecture &amp; parameter reference</a></li>
     <li><a class="dropdown-item" href="../articles/data-pipeline.html">Data pipeline internals</a></li>
+    <li><a class="dropdown-item" href="../articles/iec-evaluation.html">Evaluating predictions with IEC</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><a class="external-link nav-link" href="https://github.com/PM-Cardoso/RSurvivEHR" aria-label="GitHub"><span class="fa fab fa-github"></span></a></li>
@@ -150,6 +151,36 @@
 
         </dt>
         <dd>Validate the fine-tune targets data frame for RSurvivEHR</dd>
+      </dl></div><div class="section level2">
+      <h2 id="evaluation">Evaluation<a class="anchor" aria-label="anchor" href="#evaluation"></a></h2>
+
+      <div class="section-desc"><p>Evaluate how well model risk scores rank competing next events with Inter-Event Concordance (IEC).</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="survivehr_compute_iec.html">survivehr_compute_iec()</a></code>
+
+        </dt>
+        <dd>Compute Inter-Event Concordance (IEC) from Risk Scores</dd>
+
+        <dt>
+
+          <code><a href="survivehr_predict_event_risks.html">survivehr_predict_event_risks()</a></code>
+
+        </dt>
+        <dd>Extract Event Risk Scores for IEC Evaluation</dd>
+
+        <dt>
+
+          <code><a href="survivehr_evaluate_iec.html">survivehr_evaluate_iec()</a></code>
+
+        </dt>
+        <dd>High-Level Inter-Event Concordance Evaluation</dd>
       </dl></div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>

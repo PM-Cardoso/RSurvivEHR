@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">RSurvivEHR</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -23,6 +23,7 @@
     <li><a class="dropdown-item" href="../articles/advanced-topics.html">Advanced topics</a></li>
     <li><a class="dropdown-item" href="../articles/model-architecture.html">Model architecture &amp; parameter reference</a></li>
     <li><a class="dropdown-item" href="../articles/data-pipeline.html">Data pipeline internals</a></li>
+    <li><a class="dropdown-item" href="../articles/iec-evaluation.html">Evaluating predictions with IEC</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><a class="external-link nav-link" href="https://github.com/PM-Cardoso/RSurvivEHR" aria-label="GitHub"><span class="fa fab fa-github"></span></a></li>
@@ -39,16 +40,35 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.10.0" id="rsurvivehr-0100">RSurvivEHR 0.10.0<a class="anchor" aria-label="anchor" href="#rsurvivehr-0100"></a></h2>
+<div class="section level4">
+<h4 id="documentation-site-inter-event-concordance-iec-is-now-fully-integrated-0-10-0">Documentation site: Inter-Event Concordance (IEC) is now fully integrated<a class="anchor" aria-label="anchor" href="#documentation-site-inter-event-concordance-iec-is-now-fully-integrated-0-10-0"></a></h4>
+<p>The IEC evaluation feature (introduced in 0.9.3) is now wired into the pkgdown website and the package documentation, fixing the <code>build_reference_index()</code> failure <em>“topics missing from index”</em>.</p>
+<ul><li>
+<strong>New pkgdown reference section “Evaluation”</strong> in <code>_pkgdown.yml</code> listing the three IEC functions: <code><a href="../reference/survivehr_compute_iec.html">survivehr_compute_iec()</a></code>, <code><a href="../reference/survivehr_predict_event_risks.html">survivehr_predict_event_risks()</a></code>, and <code><a href="../reference/survivehr_evaluate_iec.html">survivehr_evaluate_iec()</a></code>.</li>
+<li>
+<strong>New article in the navbar</strong>: the <em>“Evaluating predictions with IEC”</em> vignette (<code>vignettes/iec-evaluation.Rmd</code>) is now linked under <em>Articles → Evaluating predictions with IEC</em>.</li>
+<li>
+<strong>S3 print methods marked internal</strong>: <code><a href="../reference/print.survivehr_iec.html">print.survivehr_iec()</a></code> and <code><a href="../reference/print.survivehr_iec_eval.html">print.survivehr_iec_eval()</a></code> now carry <code>@keywords internal</code>, so they no longer clutter the reference index while remaining exported and usable.</li>
+<li>
+<strong>Regenerated man pages</strong> from the current roxygen sources, bringing the previously stale <code>survivehr_predict_event_risks.Rd</code>, <code>survivehr_evaluate_iec.Rd</code>, and <code>survivehr_compute_iec.Rd</code> back in sync with the documented arguments and return values, and removing the orphan <code>extract_observed_events.Rd</code>.</li>
+<li>
+<strong>IEC vignette polish</strong>: the complete worked example now loads <code>dplyr</code> explicitly for the data-wrangling pipes it uses.</li>
+</ul><p><code><a href="https://pkgdown.r-lib.org/reference/check_pkgdown.html" class="external-link">pkgdown::check_pkgdown()</a></code> now reports *“No problems found in _pkgdown.yml”*.</p>
+<p><strong>Changed files:</strong> <code>_pkgdown.yml</code>, <code>R/metrics_iec.R</code>, <code>R/evaluate_iec.R</code>, <code>man/*.Rd</code>, <code>vignettes/iec-evaluation.Rmd</code>, <code>DESCRIPTION</code></p>
+</div>
+</div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.9.3" id="rsurvivehr-093">RSurvivEHR 0.9.3<a class="anchor" aria-label="anchor" href="#rsurvivehr-093"></a></h2>
 <div class="section level4">
 <h4 id="new-feature-inter-event-concordance-iec-metric-for-evaluating-competing-risk-predictions-0-9-3">New feature: Inter-Event Concordance (IEC) metric for evaluating competing-risk predictions<a class="anchor" aria-label="anchor" href="#new-feature-inter-event-concordance-iec-metric-for-evaluating-competing-risk-predictions-0-9-3"></a></h4>
 <p>Three new functions enable evaluation of how well model risk scores rank next events:</p>
 <ul><li>
-<code>survivehr_compute_iec()</code>: Pure metric calculation from pre-computed risk scores and observed events. Returns overall IEC and optional per-event stratification.</li>
+<code><a href="../reference/survivehr_compute_iec.html">survivehr_compute_iec()</a></code>: Pure metric calculation from pre-computed risk scores and observed events. Returns overall IEC and optional per-event stratification.</li>
 <li>
-<code>survivehr_predict_event_risks()</code>: Debug utility to extract full risk score matrices from pretrain models for inspection or custom analysis.</li>
+<code><a href="../reference/survivehr_predict_event_risks.html">survivehr_predict_event_risks()</a></code>: Debug utility to extract full risk score matrices from pretrain models for inspection or custom analysis.</li>
 <li>
-<code>survivehr_evaluate_iec()</code>: End-to-end production workflow combining model inference, risk score extraction, and IEC computation with batch-wise aggregation for memory efficiency.</li>
+<code><a href="../reference/survivehr_evaluate_iec.html">survivehr_evaluate_iec()</a></code>: End-to-end production workflow combining model inference, risk score extraction, and IEC computation with batch-wise aggregation for memory efficiency.</li>
 </ul><p>IEC (Inter-Event Concordance) is a ranking-based metric that measures how well predicted risk scores order competing next events: - IEC ≈ 1.0: true event ranked among highest-risk (good prediction) - IEC ≈ 0.5: true event ranked in middle of risk distribution - IEC ≈ 0.0: true event ranked among lowest-risk (poor prediction)</p>
 <p>Implementation extracted from original SurvivEHR causal_eval.py module. Comprehensive unit tests (28 tests) validate core metric calculations.</p>
 <p><strong>New files:</strong> <code>inst/python/iec_metrics.py</code>, <code>inst/python/test_iec_metrics.py</code>, <code>R/metrics_iec.R</code>, <code>R/predict_risks.R</code>, <code>R/evaluate_iec.R</code>, <code>tests/testthat/test-metrics_iec.R</code></p>
